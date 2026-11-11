@@ -7,28 +7,37 @@ import {
   BrowserEngine,
   PlatformState,
   RoleType,
-  SOPModule,
   TestCase,
-  WorkerStatus,
 } from '@/lib/types';
-import {AnalyticsSummary, ROLE_DEFINITIONS} from '@/lib/action-registry';
+import {
+  AnalyticsSummary,
+  ROLE_DEFINITIONS,
+  canPerformAction,
+} from '@/lib/action-registry';
 import VisualBuilderView from '@/components/VisualBuilderView';
 import ExecutionMonitorView from '@/components/ExecutionMonitorView';
 import DashboardAndAnalyticsView from '@/components/DashboardAndAnalyticsView';
 import OperationsAndGovernanceView from '@/components/OperationsAndGovernanceView';
 import {
+  Button,
+  PageFact,
+  PageHeader,
+  formatDuration,
+  selectClass,
+} from '@/components/ui';
+import {cn} from '@/lib/utils';
+import {
   Activity,
-  AlertCircle,
+  CheckCircle2,
   ExternalLink,
   FolderTree,
   Layers,
   LayoutDashboard,
-  Moon,
   Play,
   Server,
   Shield,
-  Sun,
   Wrench,
+  XCircle,
 } from 'lucide-react';
 
 type ActiveSection =
@@ -40,31 +49,59 @@ type ActiveSection =
   | 'workers'
   | 'admin';
 
+interface NavItem {
+  id: ActiveSection;
+  label: string;
+  icon: React.ComponentType<{className?: string}>;
+  count?: number | string;
+  countLabel?: string;
+}
+
+interface SectionMeta {
+  title: string;
+  description: string;
+  facts: PageFact[];
+}
+
 export default function PlaywrightStudioEnterpriseApp() {
   const [state, setState] = useState<PlatformState | null>(null);
   const [actionRegistry, setActionRegistry] = useState<ActionRegistryEntry[]>(
     []
   );
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<ActiveSection>('builder');
   const [selectedTestCaseId, setSelectedTestCaseId] =
     useState<string>('tc-101');
   const [selectedRunId, setSelectedRunId] = useState<string | null>('EX-1004');
   const [currentRole, setCurrentRole] =
     useState<RoleType>('platform_admin');
-  const [isDark, setIsDark] = useState<boolean>(true);
+  // The pre-paint script in layout.tsx has already applied the theme class.
+  const [isDark, setIsDark] = useState<boolean>(
+    () =>
+      typeof document !== 'undefined' &&
+      document.documentElement.classList.contains('dark')
+  );
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [statusBanner, setStatusBanner] = useState<{
     type: 'success' | 'error';
     message: string;
+    id: number;
   } | null>(null);
 
   const showToast = useCallback(
     (type: 'success' | 'error', message: string) => {
-      setStatusBanner({type, message});
+      setStatusBanner({type, message, id: Date.now()});
     },
     []
   );
+
+  // Success toasts clear themselves; errors stay until dismissed.
+  useEffect(() => {
+    if (!statusBanner || statusBanner.type === 'error') return;
+    const handle = window.setTimeout(() => setStatusBanner(null), 6000);
+    return () => window.clearTimeout(handle);
+  }, [statusBanner]);
 
   useEffect(() => {
     let active = true;
@@ -81,21 +118,23 @@ export default function PlaywrightStudioEnterpriseApp() {
       })
       .catch((err) => {
         if (!active) return;
-        showToast(
-          'error',
+        setLoadError(
           err instanceof Error ? err.message : 'Error loading state'
         );
       });
     return () => {
       active = false;
     };
-  }, [showToast]);
+  }, []);
 
   const toggleTheme = () => {
     const nextDark = !isDark;
     setIsDark(nextDark);
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', nextDark);
+    document.documentElement.classList.toggle('dark', nextDark);
+    try {
+      localStorage.setItem('studio-theme', nextDark ? 'dark' : 'light');
+    } catch {
+      // Storage blocked (private mode): theme still applies for this session.
     }
   };
 
@@ -133,7 +172,7 @@ export default function PlaywrightStudioEnterpriseApp() {
         setSelectedTestCaseId(data.testCase.id);
         showToast(
           'success',
-          `Saved ${data.testCase.code} (v${data.testCase.version}) and regenerated Playwright TypeScript spec.`
+          `Saved ${data.testCase.code} as v${data.testCase.version}. Playwright spec regenerated.`
         );
       }
     } catch {
@@ -157,7 +196,7 @@ export default function PlaywrightStudioEnterpriseApp() {
         setActiveSection('executions');
         showToast(
           data.run.status === 'passed' ? 'success' : 'error',
-          `Execution ${data.run.id} (${data.run.testCaseCode}) completed on ${data.run.workerName}: ${data.run.status.toUpperCase()} (${data.run.passedSteps}/${data.run.totalSteps} steps in ${data.run.durationMs}ms)`
+          `${data.run.id} · ${data.run.testCaseCode} ${data.run.status} on ${data.run.workerName}: ${data.run.passedSteps} of ${data.run.totalSteps} steps passed in ${formatDuration(data.run.durationMs)}.`
         );
       }
     } catch {
@@ -184,9 +223,10 @@ export default function PlaywrightStudioEnterpriseApp() {
         const passedCount = data.runs.filter(
           (r: {status: string}) => r.status === 'passed'
         ).length;
+        const failedCount = data.runs.length - passedCount;
         showToast(
-          'success',
-          `Suite execution finished: ${passedCount}/${data.runs.length} test cases passed across parallel worker pool.`
+          failedCount > 0 ? 'error' : 'success',
+          `Suite finished: ${passedCount} passed, ${failedCount} failed across the worker pool.`
         );
       }
     } catch {
@@ -196,10 +236,29 @@ export default function PlaywrightStudioEnterpriseApp() {
     }
   };
 
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-950">
+        <div
+          role="alert"
+          className="max-w-md text-center space-y-2 text-sm text-slate-700 dark:text-slate-300"
+        >
+          <p className="font-semibold text-red-700 dark:text-red-400">
+            Workspace could not load
+          </p>
+          <p>{loadError}. Check that the dev server is running, then reload.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!state || !analytics) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 text-sm font-mono">
-        Loading Playwright Studio Enterprise Workspace...
+      <div
+        role="status"
+        className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 text-sm"
+      >
+        Loading workspace…
       </div>
     );
   }
@@ -208,291 +267,409 @@ export default function PlaywrightStudioEnterpriseApp() {
     state.testCases.find((tc) => tc.id === selectedTestCaseId) ||
     state.testCases[0];
 
-  const navItems: {
-    id: ActiveSection;
-    label: string;
-    icon: React.ComponentType<{className?: string}>;
-    count?: number | string;
-  }[] = [
+  const workspaceName = state.workspaces[0]?.name ?? 'Workspace';
+  const drainingWorkers = state.workers.filter(
+    (w) => w.status !== 'online' && w.status !== 'busy'
+  ).length;
+  const verifiedSops = state.sopModules.filter(
+    (s) => s.validationStatus === 'verified'
+  ).length;
+  const enabledRules = state.notificationRules.filter((r) => r.enabled).length;
+  const freeSlots =
+    analytics.totalWorkerCapacity - analytics.occupiedWorkerCapacity;
+
+  const navGroups: {label: string; items: NavItem[]}[] = [
     {
-      id: 'dashboard',
-      label: 'Overview & Analytics',
-      icon: LayoutDashboard,
-      count: `${analytics.passRatePercent}%`,
+      label: 'Monitor',
+      items: [
+        {
+          id: 'dashboard',
+          label: 'Overview',
+          icon: LayoutDashboard,
+          count: `${analytics.passRatePercent}%`,
+          countLabel: 'pass rate',
+        },
+        {
+          id: 'executions',
+          label: 'Executions',
+          icon: Activity,
+          count: state.executions.length,
+          countLabel: 'runs',
+        },
+      ],
     },
     {
-      id: 'builder',
-      label: 'Visual Test Builder',
-      icon: Wrench,
-      count: state.testCases.length,
+      label: 'Build',
+      items: [
+        {
+          id: 'builder',
+          label: 'Visual Builder',
+          icon: Wrench,
+          count: state.testCases.length,
+          countLabel: 'test cases',
+        },
+        {
+          id: 'projects',
+          label: 'Projects & Suites',
+          icon: FolderTree,
+          count: state.projects.length,
+          countLabel: 'projects',
+        },
+        {
+          id: 'sop',
+          label: 'SOP Library',
+          icon: Layers,
+          count: state.sopModules.length,
+          countLabel: 'modules',
+        },
+      ],
     },
     {
-      id: 'executions',
-      label: 'Executions & Reports',
-      icon: Activity,
-      count: state.executions.length,
-    },
-    {
-      id: 'projects',
-      label: 'Projects & Test Suites',
-      icon: FolderTree,
-      count: state.projects.length,
-    },
-    {
-      id: 'sop',
-      label: 'SOP Module Library',
-      icon: Layers,
-      count: state.sopModules.length,
-    },
-    {
-      id: 'workers',
-      label: 'Worker Management',
-      icon: Server,
-      count: `${analytics.onlineWorkers}/${state.workers.length}`,
-    },
-    {
-      id: 'admin',
-      label: 'RBAC, Secrets & Audit',
-      icon: Shield,
+      label: 'Operate',
+      items: [
+        {
+          id: 'workers',
+          label: 'Workers',
+          icon: Server,
+          count: `${analytics.onlineWorkers}/${state.workers.length}`,
+          countLabel: 'online',
+        },
+        {
+          id: 'admin',
+          label: 'Access & Audit',
+          icon: Shield,
+        },
+      ],
     },
   ];
+  const navItems = navGroups.flatMap((g) => g.items);
+
+  const sectionMeta: Record<ActiveSection, SectionMeta> = {
+    dashboard: {
+      title: 'Overview',
+      description:
+        'Health of the test estate: pass rate, slow or flaky tests, open failures and worker capacity.',
+      facts: [
+        {
+          label: 'Pass rate (target 95%)',
+          value: `${analytics.passRatePercent}%`,
+          tone: analytics.passRatePercent >= 95 ? 'good' : 'warn',
+        },
+        {label: 'Runs recorded', value: analytics.totalExecutions},
+        {
+          label: 'Failed runs',
+          value: analytics.failedExecutions,
+          tone: analytics.failedExecutions > 0 ? 'bad' : 'neutral',
+        },
+        {
+          label: 'Flaky tests',
+          value: analytics.flakyTestsCount,
+          tone: analytics.flakyTestsCount > 0 ? 'warn' : 'neutral',
+        },
+        {
+          label: 'Free worker slots',
+          value: `${freeSlots} / ${analytics.totalWorkerCapacity}`,
+        },
+      ],
+    },
+    builder: {
+      title: 'Visual Builder',
+      description:
+        'Compose a test from Playwright actions and SOP modules. The TypeScript spec regenerates as you edit.',
+      facts: [],
+    },
+    executions: {
+      title: 'Executions',
+      description:
+        'Every recorded run with step results, worker logs, the exact spec that ran and its artifacts.',
+      facts: [
+        {label: 'Runs recorded', value: analytics.totalExecutions},
+        {
+          label: 'Passed',
+          value: analytics.passedExecutions,
+          tone: 'good',
+        },
+        {
+          label: 'Failed',
+          value: analytics.failedExecutions,
+          tone: analytics.failedExecutions > 0 ? 'bad' : 'neutral',
+        },
+        {
+          label: 'Average duration',
+          value: formatDuration(analytics.avgDurationMs),
+        },
+        {
+          label: 'Average queue wait',
+          value: formatDuration(analytics.avgQueueWaitMs),
+        },
+      ],
+    },
+    projects: {
+      title: 'Projects & Suites',
+      description:
+        'Workspace hierarchy: project → environments → test plans → suites → test cases.',
+      facts: [
+        {label: 'Projects', value: state.projects.length},
+        {label: 'Test plans', value: state.testPlans.length},
+        {label: 'Test suites', value: state.testSuites.length},
+        {label: 'Test cases', value: state.testCases.length},
+        {
+          label: 'Environments',
+          value: state.projects.reduce(
+            (n, p) => n + p.environments.length,
+            0
+          ),
+        },
+      ],
+    },
+    sop: {
+      title: 'SOP Library',
+      description:
+        'Versioned, reusable step sequences. Tests import them by slug instead of copying steps.',
+      facts: [
+        {label: 'Modules', value: state.sopModules.length},
+        {label: 'Verified', value: verifiedSops, tone: 'good'},
+        {
+          label: 'Draft or deprecated',
+          value: state.sopModules.length - verifiedSops,
+          tone:
+            state.sopModules.length - verifiedSops > 0 ? 'warn' : 'neutral',
+        },
+        {
+          label: 'Uses across tests',
+          value: state.sopModules.reduce((n, s) => n + s.usageCount, 0),
+        },
+      ],
+    },
+    workers: {
+      title: 'Workers',
+      description:
+        'Containerised Playwright runners. Drain a node to stop new jobs; change slots to cap parallel runs.',
+      facts: [
+        {
+          label: 'Online',
+          value: `${analytics.onlineWorkers} / ${state.workers.length}`,
+          tone: 'good',
+        },
+        {
+          label: 'Draining or down',
+          value: drainingWorkers,
+          tone: drainingWorkers > 0 ? 'warn' : 'neutral',
+        },
+        {label: 'Busy slots', value: analytics.occupiedWorkerCapacity},
+        {label: 'Free slots', value: freeSlots},
+        {
+          label: 'Runs executed',
+          value: state.workers.reduce((n, w) => n + w.totalExecuted, 0),
+        },
+      ],
+    },
+    admin: {
+      title: 'Access & Audit',
+      description:
+        'Who can do what, which secrets tests may reference, where failures are reported, and what changed.',
+      facts: [
+        {label: 'Roles', value: Object.keys(ROLE_DEFINITIONS).length},
+        {label: 'Stored secrets', value: state.secrets.length},
+        {
+          label: 'Alert rules on',
+          value: `${enabledRules} / ${state.notificationRules.length}`,
+        },
+        {label: 'Audit entries', value: state.auditLogs.length},
+      ],
+    },
+  };
+
+  const meta = sectionMeta[activeSection];
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      {/* Top Bar following strict 3-zone contract */}
-      <header className="flex items-center justify-between gap-8 px-6 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        {/* Zone 1: Single text element wordmark */}
-        <button
-          type="button"
-          onClick={() => setActiveSection('dashboard')}
-          className="text-base font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0 cursor-pointer"
-        >
-          Playwright Studio Enterprise
-        </button>
-
-        {/* Zone 2: 5 concise single-line text navigation links */}
-        <nav
-          aria-label="Primary Navigation"
-          className="hidden md:flex items-center gap-6 text-xs font-medium text-slate-600 dark:text-slate-300"
-        >
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 lg:flex">
+      {/* Sidebar: brand, grouped navigation, session controls */}
+      <aside className="lg:w-60 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 bg-white dark:bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 flex flex-col">
+        <div className="px-4 pt-4 pb-3">
           <button
             type="button"
             onClick={() => setActiveSection('dashboard')}
-            className={`hover:text-slate-900 dark:hover:text-white hover:underline transition-colors whitespace-nowrap shrink-0 ${
-              activeSection === 'dashboard'
-                ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                : ''
-            }`}
+            className="text-left"
           >
-            Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection('builder')}
-            className={`hover:text-slate-900 dark:hover:text-white hover:underline transition-colors whitespace-nowrap shrink-0 ${
-              activeSection === 'builder'
-                ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                : ''
-            }`}
-          >
-            Visual Builder
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection('executions')}
-            className={`hover:text-slate-900 dark:hover:text-white hover:underline transition-colors whitespace-nowrap shrink-0 ${
-              activeSection === 'executions'
-                ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                : ''
-            }`}
-          >
-            Executions
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection('sop')}
-            className={`hover:text-slate-900 dark:hover:text-white hover:underline transition-colors whitespace-nowrap shrink-0 ${
-              activeSection === 'sop'
-                ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                : ''
-            }`}
-          >
-            SOP Modules
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection('workers')}
-            className={`hover:text-slate-900 dark:hover:text-white hover:underline transition-colors whitespace-nowrap shrink-0 ${
-              activeSection === 'workers'
-                ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                : ''
-            }`}
-          >
-            Workers
-          </button>
-        </nav>
-
-        {/* Zone 3: 1 primary action */}
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            disabled={isExecuting}
-            onClick={() =>
-              handleExecuteTestCase(selectedTestCase.id, 'chromium')
-            }
-            className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors whitespace-nowrap shrink-0 disabled:opacity-50"
-          >
-            <Play className="w-3.5 h-3.5 inline mr-1.5" />
-            {isExecuting ? 'Running Test...' : `Run ${selectedTestCase.code}`}
+            <span className="block text-[15px] font-bold tracking-tight text-slate-900 dark:text-white font-display">
+              Playwright Studio
+            </span>
+            <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">
+              {workspaceName}
+            </span>
           </button>
         </div>
-      </header>
 
-      {/* Main Workspace Layout: Sidebar + Content Viewport */}
-      <div className="flex-1 flex flex-col lg:flex-row">
-        {/* Left Enterprise Sidebar (256px on desktop) */}
-        <aside className="w-full lg:w-64 shrink-0 bg-white dark:bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between gap-6">
-          <div className="space-y-4">
-            {/* Workspace Context */}
-            <div className="px-2.5 py-2 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs">
-              <div className="text-slate-400 font-medium">Active Workspace</div>
-              <div className="font-bold text-slate-900 dark:text-white truncate mt-0.5">
-                {state.workspaces[0]?.name}
-              </div>
-              <div className="text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                {state.projects.length} Projects · {analytics.onlineWorkers} Workers
-              </div>
-            </div>
-
-            {/* Sidebar Links */}
-            <nav aria-label="Workspace Sections" className="space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = activeSection === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveSection(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-                      active
-                        ? 'bg-blue-600 text-white font-semibold'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </span>
-                    {item.count !== undefined && (
-                      <span
-                        className={`font-mono tabular-nums text-xs ${
-                          active
-                            ? 'text-blue-100'
-                            : 'text-slate-400 dark:text-slate-500'
-                        }`}
-                      >
-                        {item.count}
+        <nav
+          aria-label="Workspace sections"
+          className="px-2 pb-3 lg:flex-1 lg:overflow-y-auto"
+        >
+          {/* Mobile: one scrolling row. Desktop: grouped list. */}
+          <div className="flex lg:block gap-1 overflow-x-auto lg:overflow-visible lg:space-y-4 [scrollbar-width:none]">
+            {navGroups.map((group) => (
+              <div key={group.label} className="flex lg:block gap-1 shrink-0">
+                <div className="hidden lg:block px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  {group.label}
+                </div>
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-current={active ? 'page' : undefined}
+                      onClick={() => setActiveSection(item.id)}
+                      className={cn(
+                        'lg:w-full flex items-center justify-between gap-3 px-2.5 h-9 text-sm rounded-md transition-colors whitespace-nowrap shrink-0',
+                        active
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
+                      )}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Icon
+                          className={cn(
+                            'w-4 h-4 shrink-0',
+                            active && 'text-blue-600 dark:text-blue-400'
+                          )}
+                        />
+                        {item.label}
                       </span>
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
+                      {item.count !== undefined && (
+                        <span
+                          className="hidden lg:inline font-mono tabular-nums text-xs text-slate-400 dark:text-slate-500"
+                          title={item.countLabel}
+                        >
+                          {item.count}
+                          {item.countLabel && (
+                            <span className="sr-only"> {item.countLabel}</span>
+                          )}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
+        </nav>
 
-          {/* Bottom Sidebar Controls: Target App Link, Role Switcher & Theme Toggle */}
-          <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800 text-xs">
+        <div className="hidden lg:block px-4 py-4 space-y-3 border-t border-slate-200 dark:border-slate-800 text-[13px]">
+          <div>
+            <label
+              htmlFor="sidebar-role-select"
+              className="block text-xs text-slate-500 dark:text-slate-400 mb-1"
+            >
+              Acting as role
+            </label>
+            <select
+              id="sidebar-role-select"
+              aria-label="Active RBAC Role"
+              value={currentRole}
+              onChange={(e) => setCurrentRole(e.target.value as RoleType)}
+              className={cn(selectClass, 'w-full text-[13px]')}
+            >
+              {(Object.keys(ROLE_DEFINITIONS) as RoleType[]).map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_DEFINITIONS[r].label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center justify-between gap-2">
             <Link
               href="/sample-app"
-              className="w-full flex items-center justify-between px-3 py-2 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-blue-600 dark:text-blue-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center gap-1.5 text-blue-700 dark:text-blue-400 hover:underline"
             >
-              <span>Controlled Target App</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              Target app
+              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
             </Link>
-
-            <div>
-              <label
-                htmlFor="sidebar-role-select"
-                className="block text-slate-500 dark:text-slate-400 mb-1"
-              >
-                Active RBAC Role:
-              </label>
-              <select
-                id="sidebar-role-select"
-                aria-label="Active RBAC Role"
-                value={currentRole}
-                onChange={(e) => setCurrentRole(e.target.value as RoleType)}
-                className="w-full px-2.5 py-1.5 text-xs font-medium rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
-              >
-                {(Object.keys(ROLE_DEFINITIONS) as RoleType[]).map((r) => (
-                  <option key={r} value={r}>
-                    {ROLE_DEFINITIONS[r].label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <button
               type="button"
               onClick={toggleTheme}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-md border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:underline"
             >
-              <span>Appearance Theme</span>
-              <span className="flex items-center gap-1.5 font-mono">
-                {isDark ? (
-                  <>
-                    <Moon className="w-3.5 h-3.5" /> Dark
-                  </>
-                ) : (
-                  <>
-                    <Sun className="w-3.5 h-3.5" /> Light
-                  </>
-                )}
-              </span>
+              {isDark ? 'Light theme' : 'Dark theme'}
             </button>
           </div>
-        </aside>
+        </div>
+      </aside>
 
-        {/* Main Content Viewport */}
-        <main className="flex-1 min-w-0 p-6 space-y-5">
-          {/* Contextual Breadcrumb & Status Banner Row */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-              <span>{state.workspaces[0]?.name}</span>
-              <span>/</span>
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {navItems.find((n) => n.id === activeSection)?.label}
-              </span>
-              <span>·</span>
-              <span className="font-mono">
-                Role: {ROLE_DEFINITIONS[currentRole].label}
-              </span>
-            </div>
+      {/* Main column */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 px-4 lg:px-6 h-auto min-h-14 py-2 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200 dark:border-slate-800">
+          <nav
+            aria-label="Breadcrumb"
+            className="text-[13px] text-slate-500 dark:text-slate-400 min-w-0 truncate"
+          >
+            <span>{workspaceName}</span>
+            <span aria-hidden="true" className="mx-2">
+              /
+            </span>
+            <span className="font-medium text-slate-900 dark:text-white">
+              {navItems.find((n) => n.id === activeSection)?.label}
+            </span>
+          </nav>
 
-            {statusBanner && (
-              <div
-                role="status"
-                className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 border ${
-                  statusBanner.type === 'error'
-                    ? 'bg-red-50 dark:bg-red-950/50 border-red-300 dark:border-red-800 text-red-700 dark:text-red-300'
-                    : 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
-                }`}
-              >
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>{statusBanner.message}</span>
-                <button
-                  type="button"
-                  onClick={() => setStatusBanner(null)}
-                  className="ml-2 underline"
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* Role + theme stay reachable on small screens where the sidebar footer is hidden. */}
+            <label htmlFor="header-role-select" className="sr-only">
+              Acting as role
+            </label>
+            <select
+              id="header-role-select"
+              value={currentRole}
+              onChange={(e) => setCurrentRole(e.target.value as RoleType)}
+              className={cn(selectClass, 'lg:hidden h-7 text-xs max-w-36')}
+            >
+              {(Object.keys(ROLE_DEFINITIONS) as RoleType[]).map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_DEFINITIONS[r].label}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="lg:hidden"
+            >
+              {isDark ? 'Light' : 'Dark'}
+            </Button>
+            <span className="hidden lg:inline text-xs text-slate-500 dark:text-slate-400">
+              {ROLE_DEFINITIONS[currentRole].label}
+            </span>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Play}
+              disabled={
+                isExecuting ||
+                !canPerformAction(currentRole, 'canExecuteTests')
+              }
+              title={
+                canPerformAction(currentRole, 'canExecuteTests')
+                  ? `Run ${selectedTestCase.code} on chromium`
+                  : 'Your role cannot start runs'
+              }
+              onClick={() =>
+                handleExecuteTestCase(selectedTestCase.id, 'chromium')
+              }
+            >
+              {isExecuting ? 'Running…' : `Run ${selectedTestCase.code}`}
+            </Button>
           </div>
+        </header>
 
-          {/* Active View Render */}
+        <main className="flex-1 min-w-0 p-4 lg:p-6 space-y-6">
+          <PageHeader
+            title={meta.title}
+            description={meta.description}
+            facts={meta.facts}
+          />
+
           {activeSection === 'builder' && (
             <VisualBuilderView
               state={state}
@@ -535,6 +712,7 @@ export default function PlaywrightStudioEnterpriseApp() {
                 setSelectedRunId(runId);
                 setActiveSection('executions');
               }}
+              onOpenSection={(s) => setActiveSection(s)}
               currentRole={currentRole}
               isExecuting={isExecuting}
             />
@@ -552,7 +730,7 @@ export default function PlaywrightStudioEnterpriseApp() {
                 setCurrentRole(r);
                 showToast(
                   'success',
-                  `Switched active RBAC role to ${ROLE_DEFINITIONS[r].label}`
+                  `Now acting as ${ROLE_DEFINITIONS[r].label}`
                 );
               }}
               onOpenInBuilder={(tc) => {
@@ -576,19 +754,16 @@ export default function PlaywrightStudioEnterpriseApp() {
                 await postAction({action: 'save_sop_module', sopModule});
                 showToast(
                   'success',
-                  `Registered SOP module "${sopModule.name}" in central library`
+                  `Published SOP module "${sopModule.name}"`
                 );
               }}
               onUpdateWorker={async (payload) => {
                 await postAction({action: 'update_worker', ...payload});
-                showToast('success', `Updated worker node configuration`);
+                showToast('success', 'Worker configuration updated');
               }}
               onRegisterWorker={async (payload) => {
                 await postAction({action: 'register_worker', ...payload});
-                showToast(
-                  'success',
-                  `Registered new worker container ${payload.name}`
-                );
+                showToast('success', `Registered worker ${payload.name}`);
               }}
               onCreateProject={async (payload) => {
                 await postAction({action: 'create_project', ...payload});
@@ -598,7 +773,7 @@ export default function PlaywrightStudioEnterpriseApp() {
                 await postAction({action: 'add_secret', ...payload});
                 showToast(
                   'success',
-                  `Encrypted and stored secret {{SECRET:${payload.key}}}`
+                  `Encrypted and stored {{SECRET:${payload.key}}}`
                 );
               }}
               onToggleNotificationRule={async (ruleId) => {
@@ -610,6 +785,47 @@ export default function PlaywrightStudioEnterpriseApp() {
             />
           )}
         </main>
+      </div>
+
+      {/* Toast: bottom-right, announced politely; errors persist until dismissed. */}
+      <div
+        aria-live="polite"
+        className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 sm:max-w-md"
+      >
+        {statusBanner && (
+          <div
+            key={statusBanner.id}
+            role="status"
+            className={cn(
+              'flex items-start gap-3 px-4 py-3 rounded-lg border shadow-lg text-[13px] bg-white dark:bg-slate-900',
+              statusBanner.type === 'error'
+                ? 'border-red-300 dark:border-red-900'
+                : 'border-emerald-300 dark:border-emerald-900'
+            )}
+          >
+            {statusBanner.type === 'error' ? (
+              <XCircle
+                className="w-4 h-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400"
+                aria-hidden="true"
+              />
+            ) : (
+              <CheckCircle2
+                className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                aria-hidden="true"
+              />
+            )}
+            <span className="flex-1 text-slate-800 dark:text-slate-200">
+              {statusBanner.message}
+            </span>
+            <button
+              type="button"
+              onClick={() => setStatusBanner(null)}
+              className="text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

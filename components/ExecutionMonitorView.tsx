@@ -9,16 +9,26 @@ import {
 } from '@/lib/types';
 import {canPerformAction} from '@/lib/action-registry';
 import {
+  Button,
+  EmptyState,
+  FactGrid,
+  Panel,
+  StatusBadge,
+  Tabs,
+  formatDuration,
+  formatTimestamp,
+  inputClass,
+  selectClass,
+  toneText,
+} from '@/components/ui';
+import {cn} from '@/lib/utils';
+import {
   AlertCircle,
-  CheckCircle2,
-  Clock,
   Download,
   FileSpreadsheet,
   GitCompare,
   Play,
   Search,
-  Terminal,
-  XCircle,
 } from 'lucide-react';
 
 interface ExecutionMonitorViewProps {
@@ -37,6 +47,15 @@ interface ExecutionMonitorViewProps {
   currentRole: RoleType;
   isExecuting: boolean;
 }
+
+type ReportTab = 'steps' | 'logs' | 'spec' | 'artifacts';
+
+const TRIGGER_LABEL: Record<ExecutionRun['triggerSource'], string> = {
+  manual: 'Manual',
+  suite: 'Suite run',
+  schedule: 'Schedule',
+  ci_webhook: 'CI webhook',
+};
 
 export default function ExecutionMonitorView({
   state,
@@ -60,11 +79,12 @@ export default function ExecutionMonitorView({
   const [compareRunIdB, setCompareRunIdB] = useState<string>(
     state.executions[1]?.id || state.executions[0]?.id || ''
   );
-  const [reportTab, setReportTab] = useState<'steps' | 'logs' | 'spec' | 'artifacts'>('steps');
+  const [reportTab, setReportTab] = useState<ReportTab>('steps');
 
   const canExecute = canPerformAction(currentRole, 'canExecuteTests');
 
   const filteredExecutions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return state.executions.filter((ex) => {
       const matchStatus = statusFilter === 'all' || ex.status === statusFilter;
       const matchBrowser =
@@ -72,11 +92,11 @@ export default function ExecutionMonitorView({
       const matchProj =
         projectFilter === 'all' || ex.projectId === projectFilter;
       const matchSearch =
-        !searchQuery.trim() ||
-        ex.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ex.testCaseCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ex.testCaseTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ex.workerName.toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        ex.id.toLowerCase().includes(q) ||
+        ex.testCaseCode.toLowerCase().includes(q) ||
+        ex.testCaseTitle.toLowerCase().includes(q) ||
+        ex.workerName.toLowerCase().includes(q);
       return matchStatus && matchBrowser && matchProj && matchSearch;
     });
   }, [
@@ -86,6 +106,12 @@ export default function ExecutionMonitorView({
     projectFilter,
     searchQuery,
   ]);
+
+  const filtersActive =
+    statusFilter !== 'all' ||
+    browserFilter !== 'all' ||
+    projectFilter !== 'all' ||
+    searchQuery.trim() !== '';
 
   const activeRun: ExecutionRun | undefined = useMemo(() => {
     if (selectedRunId) {
@@ -98,6 +124,12 @@ export default function ExecutionMonitorView({
   const compareRunB: ExecutionRun | undefined = useMemo(() => {
     return state.executions.find((e) => e.id === compareRunIdB);
   }, [state.executions, compareRunIdB]);
+
+  const selectedSuite = state.testSuites.find((s) => s.id === suiteToRun);
+  const suiteCaseCount =
+    suiteToRun === 'all'
+      ? state.testCases.length
+      : state.testCases.filter((tc) => tc.testSuiteId === suiteToRun).length;
 
   const handleExportCsv = () => {
     const headers = [
@@ -151,97 +183,110 @@ export default function ExecutionMonitorView({
     URL.revokeObjectURL(url);
   };
 
+  const firstFailedStep = activeRun?.stepResults.find(
+    (s) => s.status === 'failed'
+  );
+
   return (
     <div className="space-y-6">
-      {/* Top Suite Execution & Export Action Bar */}
-      <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Suite Orchestrator:
+      {/* Suite runner + exports */}
+      <Panel
+        title="Run a suite"
+        description={
+          selectedSuite
+            ? `${selectedSuite.name}: ${suiteCaseCount} test cases, up to ${selectedSuite.parallelism} in parallel.`
+            : `Every active suite: ${suiteCaseCount} test cases.`
+        }
+        actions={
+          <>
+            <Button
+              size="sm"
+              variant={compareMode ? 'subtle' : 'secondary'}
+              icon={GitCompare}
+              aria-pressed={compareMode}
+              onClick={() => setCompareMode((prev) => !prev)}
+            >
+              {compareMode ? 'Close comparison' : 'Compare two runs'}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={FileSpreadsheet}
+              onClick={handleExportCsv}
+            >
+              Export CSV ({filteredExecutions.length})
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-1 sm:flex-none">
+            <label
+              htmlFor="suite-select"
+              className="block text-xs text-slate-500 dark:text-slate-400 mb-1"
+            >
+              Suite
+            </label>
+            <select
+              id="suite-select"
+              aria-label="Select Test Suite"
+              value={suiteToRun}
+              onChange={(e) => setSuiteToRun(e.target.value)}
+              className={cn(selectClass, 'w-full sm:w-72')}
+            >
+              <option value="all">All active suites</option>
+              {state.testSuites.map((ts) => (
+                <option key={ts.id} value={ts.id}>
+                  {ts.name} ({ts.parallelism}× parallel)
+                </option>
+              ))}
+            </select>
           </div>
-          <label htmlFor="suite-select" className="sr-only">
-            Select Test Suite
-          </label>
-          <select
-            id="suite-select"
-            aria-label="Select Test Suite"
-            value={suiteToRun}
-            onChange={(e) => setSuiteToRun(e.target.value)}
-            className="px-3 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
-          >
-            <option value="all">
-              All Active Test Suites ({state.testCases.length} tests)
-            </option>
-            {state.testSuites.map((ts) => (
-              <option key={ts.id} value={ts.id}>
-                Suite: {ts.name} (Parallelism: {ts.parallelism}x)
-              </option>
-            ))}
-          </select>
-
-          <label htmlFor="suite-browser-select" className="sr-only">
-            Select Suite Target Browser
-          </label>
-          <select
-            id="suite-browser-select"
-            aria-label="Select Suite Target Browser"
-            value={suiteBrowser}
-            onChange={(e) => setSuiteBrowser(e.target.value as BrowserEngine)}
-            className="px-2.5 py-1.5 text-xs font-mono rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
-          >
-            <option value="chromium">chromium</option>
-            <option value="firefox">firefox</option>
-            <option value="webkit">webkit</option>
-          </select>
-
-          <button
-            type="button"
+          <div>
+            <label
+              htmlFor="suite-browser-select"
+              className="block text-xs text-slate-500 dark:text-slate-400 mb-1"
+            >
+              Browser
+            </label>
+            <select
+              id="suite-browser-select"
+              aria-label="Select Suite Target Browser"
+              value={suiteBrowser}
+              onChange={(e) => setSuiteBrowser(e.target.value as BrowserEngine)}
+              className={cn(selectClass, 'font-mono')}
+            >
+              <option value="chromium">chromium</option>
+              <option value="firefox">firefox</option>
+              <option value="webkit">webkit</option>
+            </select>
+          </div>
+          <Button
+            variant="primary"
+            icon={Play}
             disabled={!canExecute || isExecuting}
             onClick={() => onExecuteSuite(suiteToRun, suiteBrowser)}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-md bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 whitespace-nowrap shrink-0"
           >
-            <Play className="w-3.5 h-3.5" />
-            {isExecuting ? 'Running Suite...' : 'Run Suite Across Workers'}
-          </button>
+            {isExecuting ? 'Running suite…' : 'Run suite'}
+          </Button>
+          {!canExecute && (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Your role cannot start runs.
+            </span>
+          )}
         </div>
+      </Panel>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setCompareMode((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors whitespace-nowrap shrink-0 ${
-              compareMode
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <GitCompare className="w-3.5 h-3.5" />
-            {compareMode ? 'Exit Run Comparison' : 'Compare Runs'}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            Export CSV ({filteredExecutions.length})
-          </button>
-        </div>
-      </div>
-
-      {/* Optional Side-by-Side Run Comparison View */}
+      {/* Side-by-side comparison */}
       {compareMode && activeRun && compareRunB && (
-        <div className="p-5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              Historical Execution Comparison
-            </h3>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="font-mono text-slate-500">
-                Baseline A: <strong>{activeRun.id}</strong> ({activeRun.testCaseCode})
+        <Panel
+          title="Run comparison"
+          description="Steps whose outcome differs between the two runs are highlighted."
+          actions={
+            <div className="flex items-center gap-2 text-[13px]">
+              <span className="text-slate-500 dark:text-slate-400">
+                A: <span className="font-mono">{activeRun.id}</span> vs B:
               </span>
-              <span>vs.</span>
               <label htmlFor="compare-run-b-select" className="sr-only">
                 Select Comparison Run B
               </label>
@@ -249,124 +294,147 @@ export default function ExecutionMonitorView({
                 id="compare-run-b-select"
                 value={compareRunIdB}
                 onChange={(e) => setCompareRunIdB(e.target.value)}
-                className="px-2.5 py-1 text-xs font-mono rounded border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+                className={cn(selectClass, 'h-8 text-xs font-mono')}
               >
                 {state.executions.map((ex) => (
                   <option key={ex.id} value={ex.id}>
-                    {ex.id} · {ex.testCaseCode} ({ex.status.toUpperCase()} · {ex.browser})
+                    {ex.id} · {ex.testCaseCode} · {ex.status} · {ex.browser}
                   </option>
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {[activeRun, compareRunB].map((r, idx) => (
-              <div
-                key={`${r.id}-${idx}`}
-                className="p-4 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 space-y-2"
-              >
-                <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white">
-                  <span>
-                    {idx === 0 ? 'Run A' : 'Run B'}: {r.id} ({r.testCaseCode})
-                  </span>
-                  <span
-                    className={
-                      r.status === 'passed'
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-red-600 dark:text-red-400'
-                    }
-                  >
-                    {r.status.toUpperCase()}
-                  </span>
-                </div>
-                <div className="text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                  Browser: {r.browser} · Worker: {r.workerName} · Duration:{' '}
-                  {r.durationMs}ms · Passed: {r.passedSteps}/{r.totalSteps}
-                </div>
-                <div className="space-y-1 pt-2 border-t border-slate-200 dark:border-slate-800">
-                  {r.stepResults.map((sr) => (
-                    <div
-                      key={sr.stepId}
-                      className="flex items-center justify-between font-mono"
-                    >
-                      <span className="truncate max-w-[260px]">
-                        {sr.stepIndex + 1}. {sr.label}
-                      </span>
-                      <span
-                        className={
-                          sr.status === 'passed'
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-red-600 dark:text-red-400'
-                        }
-                      >
-                        {sr.status.toUpperCase()} ({sr.durationMs}ms)
-                      </span>
+          }
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[activeRun, compareRunB].map((r, idx) => {
+              const other = idx === 0 ? compareRunB : activeRun;
+              return (
+                <div
+                  key={`${r.id}-${idx}`}
+                  className="rounded-md border border-slate-200 dark:border-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+                    <div className="text-sm font-medium text-slate-900 dark:text-white">
+                      {idx === 0 ? 'A' : 'B'} ·{' '}
+                      <span className="font-mono">{r.id}</span> ·{' '}
+                      {r.testCaseCode}
                     </div>
-                  ))}
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <div className="px-3 py-2 text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                    {r.browser} · {r.workerName} ·{' '}
+                    {formatDuration(r.durationMs)} · {r.passedSteps} of{' '}
+                    {r.totalSteps} passed
+                  </div>
+                  <ol className="divide-y divide-slate-100 dark:divide-slate-800 text-[13px]">
+                    {r.stepResults.map((sr) => {
+                      const peer = other.stepResults[sr.stepIndex];
+                      const differs = peer && peer.status !== sr.status;
+                      return (
+                        <li
+                          key={sr.stepId}
+                          className={cn(
+                            'flex items-center justify-between gap-3 px-3 py-1.5',
+                            differs && 'bg-amber-50 dark:bg-amber-950/30'
+                          )}
+                        >
+                          <span className="truncate text-slate-700 dark:text-slate-300">
+                            <span className="font-mono text-slate-400 mr-2">
+                              {sr.stepIndex + 1}
+                            </span>
+                            {sr.label}
+                          </span>
+                          <span className="flex items-center gap-2 shrink-0 font-mono text-xs tabular-nums">
+                            <span className="text-slate-500">
+                              {formatDuration(sr.durationMs)}
+                            </span>
+                            <StatusBadge status={sr.status} />
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </div>
+        </Panel>
       )}
 
-      {/* Main Split: Left Execution History Table (5 cols) + Right Detailed Execution Report (7 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left: Filterable Execution History List */}
-        <div className="lg:col-span-5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-              Persisted Execution Runs ({filteredExecutions.length})
-            </h2>
-          </div>
-
-          {/* Filter Controls */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        {/* Run list */}
+        <Panel
+          as="div"
+          className="xl:col-span-5"
+          title="Runs"
+          description={
+            filtersActive
+              ? `${filteredExecutions.length} of ${state.executions.length} runs match the filters.`
+              : `${state.executions.length} runs, newest first.`
+          }
+          actions={
+            filtersActive ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setStatusFilter('all');
+                  setBrowserFilter('all');
+                  setProjectFilter('all');
+                  setSearchQuery('');
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : undefined
+          }
+          bodyClassName="p-0"
+        >
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-3 gap-2 border-b border-slate-100 dark:border-slate-800">
             <div className="sm:col-span-3 relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search
+                className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                aria-hidden="true"
+              />
               <input
-                type="text"
+                type="search"
                 aria-label="Filter executions by ID, test case, or worker"
-                placeholder="Search EX-1004, ACME-TC-101, worker..."
+                placeholder="Run ID, test code, title or worker"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+                className={cn(inputClass, 'pl-9')}
               />
             </div>
-
             <select
               aria-label="Filter by Status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+              className={selectClass}
             >
-              <option value="all">All Statuses</option>
+              <option value="all">Any status</option>
               <option value="passed">Passed</option>
               <option value="failed">Failed</option>
               <option value="queued">Queued</option>
               <option value="cancelled">Cancelled</option>
             </select>
-
             <select
               aria-label="Filter by Browser"
               value={browserFilter}
               onChange={(e) => setBrowserFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+              className={selectClass}
             >
-              <option value="all">All Browsers</option>
+              <option value="all">Any browser</option>
               <option value="chromium">Chromium</option>
               <option value="firefox">Firefox</option>
               <option value="webkit">WebKit</option>
             </select>
-
             <select
               aria-label="Filter by Project"
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+              className={selectClass}
             >
-              <option value="all">All Projects</option>
+              <option value="all">Any project</option>
               {state.projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -375,325 +443,335 @@ export default function ExecutionMonitorView({
             </select>
           </div>
 
-          {/* Execution Rows */}
-          <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
-            {filteredExecutions.map((ex) => {
-              const isSelected = activeRun?.id === ex.id;
-              return (
-                <div
-                  key={ex.id}
-                  onClick={() => onSelectRunId(ex.id)}
-                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/30'
-                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/40 dark:bg-slate-950/40'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-900 dark:text-white">
-                      {ex.status === 'passed' ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      ) : ex.status === 'failed' ? (
-                        <XCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-                      ) : (
-                        <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                      )}
-                      <span>{ex.id}</span>
-                      <span className="text-slate-400">·</span>
-                      <span>{ex.testCaseCode}</span>
-                    </div>
-                    <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                      {ex.durationMs}ms
-                    </span>
-                  </div>
-
-                  <div className="text-xs font-medium text-slate-800 dark:text-slate-200 mt-1 truncate">
-                    {ex.testCaseTitle}
-                  </div>
-
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-1.5 font-mono">
-                    <span>{ex.browser}</span>
-                    <span>·</span>
-                    <span>{ex.workerName}</span>
-                    <span>·</span>
-                    <span className="tabular-nums">
-                      {ex.passedSteps}/{ex.totalSteps} steps
-                    </span>
-                    {ex.linkedIssueKey && (
-                      <>
-                        <span>·</span>
-                        <span className="text-red-600 dark:text-red-400 font-semibold">
-                          {ex.linkedIssueKey}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: Detailed Execution Report Inspector */}
-        <div className="lg:col-span-7 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-5">
-          {activeRun ? (
-            <>
-              {/* Report Header */}
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-                <div>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-mono">
-                    <span>Report ID: {activeRun.id}</span>
-                    <span>·</span>
-                    <span>Trigger: {activeRun.triggerSource}</span>
-                    <span>·</span>
-                    <span>By: {activeRun.triggeredBy}</span>
-                  </div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white mt-1">
-                    {activeRun.testCaseCode} — {activeRun.testCaseTitle}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400 mt-1.5 font-mono tabular-nums">
-                    <span
-                      className={`font-bold ${
-                        activeRun.status === 'passed'
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : activeRun.status === 'failed'
-                            ? 'text-red-600 dark:text-red-400'
-                            : 'text-amber-600 dark:text-amber-400'
-                      }`}
-                    >
-                      Status: {activeRun.status.toUpperCase()}
-                    </span>
-                    <span>·</span>
-                    <span>Browser: {activeRun.browser}</span>
-                    <span>·</span>
-                    <span>Worker: {activeRun.workerName}</span>
-                    <span>·</span>
-                    <span>Duration: {activeRun.durationMs}ms</span>
-                    <span>·</span>
-                    <span>Queue Wait: {activeRun.queueWaitMs}ms</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {(activeRun.status === 'queued' ||
-                    activeRun.status === 'running') && (
+          {filteredExecutions.length === 0 ? (
+            <EmptyState>No runs match these filters.</EmptyState>
+          ) : (
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[640px] overflow-y-auto">
+              {filteredExecutions.map((ex) => {
+                const isSelected = activeRun?.id === ex.id;
+                return (
+                  <li key={ex.id}>
                     <button
                       type="button"
-                      disabled={!canExecute}
-                      onClick={() => onCancelExecution(activeRun.id)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-md bg-red-600 text-white hover:bg-red-500"
-                    >
-                      Cancel Run
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={!canExecute || isExecuting}
-                    onClick={() =>
-                      onExecuteTestCase(activeRun.testCaseId, activeRun.browser)
-                    }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 whitespace-nowrap shrink-0"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                    Re-Run Test
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadJsonReport(activeRun)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Report JSON
-                  </button>
-                </div>
-              </div>
-
-              {/* Report Sub-Navigation Tabs */}
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
-                {[
-                  {
-                    id: 'steps',
-                    label: `Step Results (${activeRun.passedSteps}/${activeRun.totalSteps})`,
-                  },
-                  {id: 'logs', label: `Execution Logs (${activeRun.logs.length})`},
-                  {id: 'spec', label: 'Playwright Spec'},
-                  {id: 'artifacts', label: 'Traces & Telemetry'},
-                ].map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() =>
-                      setReportTab(
-                        t.id as 'steps' | 'logs' | 'spec' | 'artifacts'
-                      )
-                    }
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                      reportTab === t.id
-                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab 1: Step-by-Step Results */}
-              {reportTab === 'steps' && (
-                <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
-                  {activeRun.stepResults.map((sr) => (
-                    <div
-                      key={sr.stepId}
-                      className={`p-3.5 rounded-lg border ${
-                        sr.status === 'failed'
-                          ? 'border-red-300 dark:border-red-800 bg-red-50/40 dark:bg-red-950/30'
-                          : 'border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/40'
-                      }`}
+                      aria-current={isSelected ? 'true' : undefined}
+                      onClick={() => onSelectRunId(ex.id)}
+                      className={cn(
+                        'w-full text-left px-4 py-3 transition-colors border-l-2',
+                        isSelected
+                          ? 'border-blue-600 bg-blue-50/60 dark:bg-blue-950/30'
+                          : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                      )}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white">
-                          <span className="font-mono text-slate-400 tabular-nums">
-                            #{sr.stepIndex + 1}
-                          </span>
-                          <span>{sr.label}</span>
-                        </div>
-                        <div className="text-xs font-mono tabular-nums flex items-center gap-2">
-                          <span
-                            className={
-                              sr.status === 'passed'
-                                ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                                : sr.status === 'failed'
-                                  ? 'text-red-600 dark:text-red-400 font-semibold'
-                                  : 'text-slate-400'
-                            }
-                          >
-                            {sr.status.toUpperCase()}
-                          </span>
-                          <span>·</span>
-                          <span className="text-slate-500">{sr.durationMs}ms</span>
-                        </div>
+                        <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {ex.id}
+                          </span>{' '}
+                          · {ex.testCaseCode}
+                        </span>
+                        <StatusBadge status={ex.status} />
                       </div>
-
-                      <div className="mt-1.5 text-xs font-mono text-slate-600 dark:text-slate-400 flex flex-wrap items-center gap-2">
-                        <span>Action: {sr.actionId}</span>
-                        {sr.locatorResolved && (
+                      <div className="text-sm text-slate-900 dark:text-white mt-1 truncate">
+                        {ex.testCaseTitle}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono tabular-nums flex flex-wrap gap-x-2">
+                        <span>{ex.browser}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{ex.workerName}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {ex.passedSteps}/{ex.totalSteps} steps
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>{formatDuration(ex.durationMs)}</span>
+                        {ex.linkedIssueKey && (
                           <>
-                            <span>·</span>
-                            <span>Locator: {sr.locatorResolved}</span>
-                          </>
-                        )}
-                        {sr.actualValue && (
-                          <>
-                            <span>·</span>
-                            <span>Result: {sr.actualValue}</span>
+                            <span aria-hidden="true">·</span>
+                            <span className={toneText('bad')}>
+                              {ex.linkedIssueKey}
+                            </span>
                           </>
                         )}
                       </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
 
-                      {sr.errorMessage && (
-                        <div className="mt-2 p-2.5 rounded bg-red-950 text-red-200 font-mono text-xs space-y-1">
-                          <div className="font-bold flex items-center gap-1.5 text-red-300">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                            {sr.errorMessage}
-                          </div>
-                          {sr.stackTrace && (
-                            <pre className="text-xs text-red-300/90 whitespace-pre-wrap pt-1">
-                              {sr.stackTrace}
-                            </pre>
-                          )}
-                        </div>
-                      )}
-
-                      {sr.domSnapshotSnippet && (
-                        <div className="mt-2 text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-950 px-2.5 py-1.5 rounded border border-slate-200 dark:border-slate-800 overflow-x-auto">
-                          DOM Snapshot: {sr.domSnapshotSnippet}
-                        </div>
-                      )}
+        {/* Report */}
+        <Panel as="div" className="xl:col-span-7" bodyClassName="p-0">
+          {activeRun ? (
+            <>
+              <div className="p-4 space-y-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                      {activeRun.id} · run #{activeRun.runNumber} ·{' '}
+                      {activeRun.testCaseCode}
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Tab 2: Live / Persisted Execution Logs */}
-              {reportTab === 'logs' && (
-                <div className="rounded-lg bg-slate-950 text-slate-200 border border-slate-800 p-4 font-mono text-xs space-y-1.5 max-h-[500px] overflow-y-auto">
-                  <div className="text-slate-400 flex items-center gap-2 pb-2 border-b border-slate-800">
-                    <Terminal className="w-3.5 h-3.5 text-blue-400" />
-                    Worker Output Stream ({activeRun.workerName})
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-white mt-0.5">
+                      {activeRun.testCaseTitle}
+                    </h2>
                   </div>
-                  {activeRun.logs.map((line, idx) => (
-                    <div
-                      key={idx}
-                      className={
-                        line.includes('FAILED')
-                          ? 'text-red-400'
-                          : line.includes('PASSED')
-                            ? 'text-emerald-400'
-                            : 'text-slate-300'
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(activeRun.status === 'queued' ||
+                      activeRun.status === 'running') && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={!canExecute}
+                        onClick={() => onCancelExecution(activeRun.id)}
+                      >
+                        Cancel run
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={Download}
+                      onClick={() => handleDownloadJsonReport(activeRun)}
+                    >
+                      Report JSON
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      icon={Play}
+                      disabled={!canExecute || isExecuting}
+                      onClick={() =>
+                        onExecuteTestCase(
+                          activeRun.testCaseId,
+                          activeRun.browser
+                        )
                       }
                     >
-                      {line}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Tab 3: Executed Playwright Spec */}
-              {reportTab === 'spec' && (
-                <pre className="rounded-lg bg-slate-950 text-slate-200 border border-slate-800 p-4 font-mono text-xs overflow-x-auto max-h-[500px] overflow-y-auto">
-                  {activeRun.generatedSpecCode}
-                </pre>
-              )}
-
-              {/* Tab 4: Artifacts & Telemetry */}
-              {reportTab === 'artifacts' && (
-                <div className="space-y-4 text-xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-                      <div className="text-slate-500 dark:text-slate-400">
-                        Playwright Trace Bundle
-                      </div>
-                      <div className="font-mono font-bold text-slate-900 dark:text-white mt-1">
-                        {activeRun.traceArtifactId}
-                      </div>
-                      <div className="text-slate-500 mt-1">
-                        Contains DOM snapshots, HAR network log, and console timeline.
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-                      <div className="text-slate-500 dark:text-slate-400">
-                        Worker Resource Peak
-                      </div>
-                      <div className="font-mono font-bold tabular-nums text-slate-900 dark:text-white mt-1">
-                        CPU: {activeRun.cpuPeakPercent}% · RAM: {activeRun.memoryPeakMb} MB
-                      </div>
-                      <div className="text-slate-500 mt-1">
-                        Container isolated on {activeRun.workerName}
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-                      <div className="text-slate-500 dark:text-slate-400">
-                        Deduplicated Issue Link
-                      </div>
-                      <div className="font-mono font-bold text-slate-900 dark:text-white mt-1">
-                        {activeRun.linkedIssueKey || 'None (Clean Pass)'}
-                      </div>
-                      <div className="text-slate-500 mt-1 truncate">
-                        {activeRun.failureFingerprint || 'All assertions verified'}
-                      </div>
-                    </div>
+                      Re-run
+                    </Button>
                   </div>
                 </div>
-              )}
+
+                {firstFailedStep && (
+                  <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-[13px] text-red-900 dark:text-red-200">
+                    <AlertCircle
+                      className="w-4 h-4 mt-0.5 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span>
+                      Failed at step {firstFailedStep.stepIndex + 1} (
+                      {firstFailedStep.label}):{' '}
+                      {firstFailedStep.errorMessage ?? 'no error message'}
+                    </span>
+                  </div>
+                )}
+
+                <FactGrid
+                  columns={4}
+                  items={[
+                    {
+                      label: 'Status',
+                      value: <StatusBadge status={activeRun.status} />,
+                    },
+                    {
+                      label: 'Steps',
+                      value:
+                        `${activeRun.passedSteps} passed, ${activeRun.failedSteps} failed` +
+                        (activeRun.skippedSteps > 0
+                          ? `, ${activeRun.skippedSteps} skipped`
+                          : ''),
+                      mono: true,
+                    },
+                    {
+                      label: 'Duration',
+                      value: formatDuration(activeRun.durationMs),
+                      mono: true,
+                    },
+                    {
+                      label: 'Queue wait',
+                      value: formatDuration(activeRun.queueWaitMs),
+                      mono: true,
+                    },
+                    {
+                      label: 'Browser · worker',
+                      value: `${activeRun.browser} · ${activeRun.workerName}`,
+                      mono: true,
+                    },
+                    {label: 'Environment', value: activeRun.environmentName},
+                    {
+                      label: 'Trigger',
+                      value: `${TRIGGER_LABEL[activeRun.triggerSource]} by ${activeRun.triggeredBy}`,
+                    },
+                    {
+                      label: 'Started (UTC)',
+                      value: formatTimestamp(activeRun.startedAt),
+                      mono: true,
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className="px-4 pt-2">
+                <Tabs<ReportTab>
+                  label="Report sections"
+                  value={reportTab}
+                  onChange={setReportTab}
+                  items={[
+                    {
+                      id: 'steps',
+                      label: `Steps (${activeRun.stepResults.length})`,
+                    },
+                    {id: 'logs', label: `Logs (${activeRun.logs.length})`},
+                    {id: 'spec', label: 'Spec that ran'},
+                    {id: 'artifacts', label: 'Artifacts'},
+                  ]}
+                />
+              </div>
+
+              <div className="p-4">
+                {reportTab === 'steps' && (
+                  <ol className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
+                    {activeRun.stepResults.map((sr) => (
+                      <li
+                        key={sr.stepId}
+                        className={cn(
+                          'rounded-md border px-3 py-2.5',
+                          sr.status === 'failed'
+                            ? 'border-red-300 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20'
+                            : 'border-slate-200 dark:border-slate-800'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex items-start gap-2.5">
+                            <span className="w-6 text-right font-mono text-xs text-slate-400 tabular-nums pt-0.5 shrink-0">
+                              {sr.stepIndex + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-sm text-slate-900 dark:text-white">
+                                {sr.label}
+                              </div>
+                              <div className="mt-0.5 text-xs font-mono text-slate-500 dark:text-slate-400 break-all">
+                                {sr.actionId}
+                                {sr.locatorResolved &&
+                                  ` · ${sr.locatorResolved}`}
+                                {sr.actualValue && ` · got ${sr.actualValue}`}
+                                {sr.expectedValue &&
+                                  ` · expected ${sr.expectedValue}`}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs font-mono tabular-nums text-slate-500">
+                              {formatDuration(sr.durationMs)}
+                            </span>
+                            <StatusBadge status={sr.status} />
+                          </div>
+                        </div>
+
+                        {sr.errorMessage && (
+                          <div className="mt-2 ml-8 p-2.5 rounded bg-slate-950 text-red-300 font-mono text-xs">
+                            <div className="font-semibold">
+                              {sr.errorMessage}
+                            </div>
+                            {sr.stackTrace && (
+                              <pre className="whitespace-pre-wrap pt-1 text-red-300/80">
+                                {sr.stackTrace}
+                              </pre>
+                            )}
+                          </div>
+                        )}
+
+                        {sr.domSnapshotSnippet && (
+                          <div className="mt-2 ml-8 text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 rounded border border-slate-200 dark:border-slate-800 overflow-x-auto">
+                            <span className="text-slate-400">DOM: </span>
+                            {sr.domSnapshotSnippet}
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+
+                {reportTab === 'logs' && (
+                  <div className="rounded-md bg-slate-950 text-slate-200 border border-slate-800 font-mono text-xs max-h-[520px] overflow-y-auto">
+                    <div className="px-3 py-2 text-slate-400 border-b border-slate-800">
+                      Worker output · {activeRun.workerName}
+                    </div>
+                    <ol className="p-3 space-y-1">
+                      {activeRun.logs.map((line, idx) => (
+                        <li
+                          key={idx}
+                          className={cn(
+                            'whitespace-pre-wrap break-all',
+                            line.includes('FAILED')
+                              ? 'text-red-400'
+                              : line.includes('PASSED')
+                                ? 'text-emerald-400'
+                                : 'text-slate-300'
+                          )}
+                        >
+                          {line}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {reportTab === 'spec' && (
+                  <pre className="rounded-md bg-slate-950 text-slate-200 border border-slate-800 p-4 font-mono text-xs overflow-x-auto max-h-[520px] overflow-y-auto">
+                    {activeRun.generatedSpecCode}
+                  </pre>
+                )}
+
+                {reportTab === 'artifacts' && (
+                  <FactGrid
+                    columns={2}
+                    items={[
+                      {
+                        label: 'Trace bundle (DOM snapshots, HAR, console)',
+                        value: activeRun.traceArtifactId,
+                        mono: true,
+                      },
+                      {
+                        label: 'Video · screenshot',
+                        value: `${activeRun.videoArtifactId ?? 'none'} · ${activeRun.screenshotArtifactId ?? 'none'}`,
+                        mono: true,
+                      },
+                      {
+                        label: 'Worker peak usage',
+                        value: `CPU ${activeRun.cpuPeakPercent}% · RAM ${activeRun.memoryPeakMb} MB`,
+                        mono: true,
+                      },
+                      {
+                        label: 'Retry attempt',
+                        value: `${activeRun.retryAttempt} of ${activeRun.maxRetries} allowed`,
+                        mono: true,
+                      },
+                      {
+                        label: 'Linked issue',
+                        value: activeRun.linkedIssueKey ?? 'None',
+                        mono: true,
+                        tone: activeRun.linkedIssueKey ? 'bad' : 'neutral',
+                      },
+                      {
+                        label: 'Failure fingerprint',
+                        value:
+                          activeRun.failureFingerprint ??
+                          'None — all assertions passed',
+                        mono: true,
+                      },
+                    ]}
+                  />
+                )}
+              </div>
             </>
           ) : (
-            <div className="py-12 text-center text-sm text-slate-500">
-              Select an execution run on the left to inspect its step-by-step Playwright report.
-            </div>
+            <EmptyState>
+              Select a run to see its step report, logs and artifacts.
+            </EmptyState>
           )}
-        </div>
+        </Panel>
       </div>
     </div>
   );

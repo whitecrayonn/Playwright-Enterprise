@@ -18,6 +18,19 @@ import {
   getActionRegistryEntry,
 } from '@/lib/action-registry';
 import {
+  Badge,
+  Button,
+  EmptyState,
+  FactGrid,
+  Field,
+  Notice,
+  Panel,
+  Tabs,
+  inputClass,
+  selectClass,
+} from '@/components/ui';
+import {cn} from '@/lib/utils';
+import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
@@ -29,9 +42,7 @@ import {
   Eye,
   FolderPlus,
   GripVertical,
-  Layers,
   Play,
-  Plus,
   Save,
   Search,
   Settings2,
@@ -418,14 +429,25 @@ export default function VisualBuilderView({
     ? codeGenResult.stepLineMap[selectedStep.id]
     : undefined;
 
+  const priorityTone =
+    selectedTestCase.priority === 'critical'
+      ? 'bad'
+      : selectedTestCase.priority === 'high'
+        ? 'warn'
+        : 'neutral';
+  const enabledStepCount = steps.filter((s) => s.enabled).length;
+
   return (
     <div className="space-y-4">
-      {/* Builder Top Toolbar */}
-      <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3 min-w-0">
-          <div>
-            <label htmlFor="builder-testcase-select" className="sr-only">
-              Select Active Test Case
+      {/* Test case header: what is open, its state, and the actions on it */}
+      <Panel bodyClassName="p-4 space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <label
+              htmlFor="builder-testcase-select"
+              className="block text-xs text-slate-500 dark:text-slate-400 mb-1"
+            >
+              Test case
             </label>
             <select
               id="builder-testcase-select"
@@ -437,7 +459,7 @@ export default function VisualBuilderView({
                 );
                 if (found) onSelectTestCase(found);
               }}
-              className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+              className={cn(selectClass, 'w-full max-w-xl font-medium')}
             >
               {state.testCases.map((tc) => (
                 <option key={tc.id} value={tc.id}>
@@ -446,69 +468,105 @@ export default function VisualBuilderView({
               ))}
             </select>
           </div>
-
-          <button
-            type="button"
-            disabled={!canEdit}
-            onClick={() => setShowNewTestModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 whitespace-nowrap shrink-0"
-          >
-            <FolderPlus className="w-3.5 h-3.5" />
-            New Test Case
-          </button>
-
-          <a
-            href="/sample-app"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-slate-300 dark:border-slate-700 text-blue-600 dark:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            Open Target App (/sample-app)
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={FolderPlus}
+              disabled={!canEdit}
+              onClick={() => setShowNewTestModal(true)}
+            >
+              New test case
+            </Button>
+            <a
+              href="/sample-app"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs font-medium rounded-md text-blue-700 dark:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap"
+            >
+              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+              Open target app
+            </a>
+          </div>
         </div>
 
-        {/* Validation Status + Save + Execute Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="text-xs flex items-center gap-1.5 mr-2">
+        <FactGrid
+          columns={4}
+          items={[
+            {
+              label: 'Version · author',
+              value: `v${selectedTestCase.version} · ${selectedTestCase.author}`,
+            },
+            {
+              label: 'Priority · environment',
+              value: (
+                <span className="inline-flex items-center gap-2">
+                  <Badge tone={priorityTone}>{selectedTestCase.priority}</Badge>
+                  {selectedTestCase.targetEnvironment}
+                </span>
+              ),
+            },
+            {
+              label: 'Pass rate · flaky score',
+              value: `${selectedTestCase.passRate}% · ${selectedTestCase.flakyScore}%`,
+              mono: true,
+            },
+            {
+              label: 'Steps',
+              value: `${enabledStepCount} enabled of ${steps.length}`,
+              mono: true,
+            },
+          ]}
+        />
+
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex flex-wrap items-center gap-2 text-[13px]">
             {codeGenResult.valid ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Valid Workflow ({steps.length} steps)
-              </span>
+              <Badge tone="good">
+                <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                Workflow valid
+              </Badge>
             ) : (
-              <span className="text-red-600 dark:text-red-400 font-medium flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                {codeGenResult.issues.length} Validation Issue(s)
-              </span>
+              <Badge tone="bad">
+                <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+                {codeGenResult.issues.length} validation issue
+                {codeGenResult.issues.length === 1 ? '' : 's'}
+              </Badge>
             )}
             {saveMessage && (
-              <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">
-                · {saveMessage}
+              <span role="status" className="text-blue-700 dark:text-blue-400">
+                {saveMessage}
+              </span>
+            )}
+            {!canEdit && (
+              <span className="text-slate-500 dark:text-slate-400">
+                Read-only for your role.
               </span>
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleDownloadSpecFile}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Export .spec.ts
-          </button>
-
-          <button
-            type="button"
-            disabled={!canEdit}
-            onClick={handleSave}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-md bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:opacity-90 disabled:opacity-50 whitespace-nowrap shrink-0"
-          >
-            <Save className="w-3.5 h-3.5" />
-            Save Workflow
-          </button>
-
-          <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={Download}
+              onClick={handleDownloadSpecFile}
+            >
+              Export .spec.ts
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={Save}
+              disabled={!canEdit}
+              onClick={handleSave}
+            >
+              Save
+            </Button>
+            <span
+              aria-hidden="true"
+              className="hidden sm:block w-px h-6 bg-slate-200 dark:bg-slate-800"
+            />
             <label htmlFor="builder-browser-select" className="sr-only">
               Execution Browser
             </label>
@@ -519,15 +577,16 @@ export default function VisualBuilderView({
               onChange={(e) =>
                 setSelectedBrowser(e.target.value as BrowserEngine)
               }
-              className="px-2.5 py-1.5 text-xs font-mono rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+              className={cn(selectClass, 'h-7 text-xs font-mono')}
             >
               <option value="chromium">chromium</option>
               <option value="firefox">firefox</option>
               <option value="webkit">webkit</option>
             </select>
-
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant="primary"
+              icon={Play}
               disabled={!canExecute || isExecuting}
               onClick={async () => {
                 if (canEdit) {
@@ -538,175 +597,196 @@ export default function VisualBuilderView({
                 }
                 await onExecuteTestCase(selectedTestCase.id, selectedBrowser);
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-md bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 whitespace-nowrap shrink-0"
             >
-              <Play className="w-3.5 h-3.5" />
-              {isExecuting ? 'Executing...' : 'Execute Test'}
-            </button>
+              {isExecuting ? 'Executing…' : 'Save & run'}
+            </Button>
           </div>
         </div>
-      </div>
+      </Panel>
 
-      {/* Main 3-Pane Studio Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* LEFT PANE: Action Registry & SOP Module Palette (3 cols) */}
-        <div className="lg:col-span-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-              Action & SOP Library
-            </h2>
-            <span className="text-xs font-mono tabular-nums text-slate-400 whitespace-nowrap shrink-0">
-              {actionRegistry.length} Actions · {state.sopModules.length} SOPs
-            </span>
-          </div>
-
-          {/* Search Input */}
+      {/* Studio: library | workflow | inspector */}
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_minmax(0,1fr)] gap-4 items-start">
+        {/* LIBRARY */}
+        <Panel
+          as="div"
+          title="Action library"
+          description={`${actionRegistry.length} Playwright actions · ${state.sopModules.length} SOP modules`}
+          bodyClassName="p-3 space-y-3"
+        >
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search
+              className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+              aria-hidden="true"
+            />
             <input
-              type="text"
+              type="search"
               aria-label="Search Playwright actions or SOP modules"
-              placeholder="Search click, assert, SOP..."
+              placeholder="click, assert, login…"
               value={librarySearch}
               onChange={(e) => setLibrarySearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+              className={cn(inputClass, 'pl-9')}
             />
           </div>
 
-          {/* Category Filter Buttons */}
-          <div className="flex flex-wrap gap-1">
+          <div
+            role="group"
+            aria-label="Action category"
+            className="flex flex-wrap gap-1"
+          >
             {CATEGORY_LABELS.map((cat) => (
               <button
                 key={cat.id}
                 type="button"
+                aria-pressed={activeCategory === cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
+                className={cn(
+                  'px-2 h-6 text-xs font-medium rounded transition-colors whitespace-nowrap',
                   activeCategory === cat.id
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
+                )}
               >
                 {cat.label}
               </button>
             ))}
           </div>
 
-          {/* Action Items List */}
-          <div className="space-y-1.5 max-h-[560px] overflow-y-auto pr-1">
+          <div className="max-h-[600px] overflow-y-auto -mx-3 px-3 space-y-3">
             {filteredSopModules.length > 0 && (
-              <div className="pt-1 pb-1">
-                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1.5 flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5" />
-                  Reusable SOP Modules
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
+                  SOP modules
                 </div>
-                <div className="space-y-1.5">
+                <ul className="space-y-1.5">
                   {filteredSopModules.map((sop) => (
-                    <div
+                    <li
                       key={sop.id}
-                      className="p-2.5 rounded-md border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 flex items-center justify-between gap-2"
+                      className="p-2.5 rounded-md border border-blue-200 dark:border-blue-900/70 bg-blue-50/50 dark:bg-blue-950/20"
                     >
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
-                          {sop.name}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-medium text-slate-900 dark:text-white">
+                            {sop.name}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                            v{sop.version} · {sop.steps.length} steps ·{' '}
+                            {sop.inputParameters.length} inputs
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate">
-                          v{sop.version} · {sop.steps.length} steps
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          disabled={!canEdit}
+                          aria-label={`Insert SOP ${sop.name}`}
+                          onClick={() => handleAddSopStep(sop)}
+                        >
+                          Add
+                        </Button>
                       </div>
-                      <button
-                        type="button"
-                        disabled={!canEdit}
-                        aria-label={`Insert SOP ${sop.name}`}
-                        onClick={() => handleAddSopStep(sop)}
-                        className="px-2 py-1 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-40 whitespace-nowrap shrink-0"
-                      >
-                        + Add SOP
-                      </button>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
 
-            {filteredActions.map((entry) => (
-              <div
-                key={entry.id}
-                className="p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/60 dark:bg-slate-950/50 flex items-center justify-between gap-2 transition-colors"
-              >
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
-                    {entry.name}
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                    <span className="font-mono">{entry.id}</span> · {entry.category}
-                  </div>
+            {filteredActions.length > 0 && (
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
+                  Actions
                 </div>
-                <button
-                  type="button"
-                  disabled={!canEdit}
-                  aria-label={`Add ${entry.name} step`}
-                  onClick={() => handleAddActionStep(entry)}
-                  className="px-2.5 py-1 text-xs font-medium rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors disabled:opacity-40 whitespace-nowrap shrink-0"
-                >
-                  <Plus className="w-3 h-3 inline mr-0.5" />
-                  Add
-                </button>
+                <ul className="space-y-1.5">
+                  {filteredActions.map((entry) => (
+                    <li
+                      key={entry.id}
+                      className="p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-medium text-slate-900 dark:text-white">
+                            {entry.name}
+                          </div>
+                          <div
+                            className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5"
+                            title={entry.description}
+                          >
+                            {entry.description}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
+                            {entry.id}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={!canEdit}
+                          aria-label={`Add ${entry.name} step`}
+                          onClick={() => handleAddActionStep(entry)}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            ))}
-          </div>
-        </div>
+            )}
 
-        {/* CENTER PANE: Visual Workflow Canvas (5 cols) */}
-        <div className="lg:col-span-5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-4">
-          {/* Editable Test Case Title & Metadata */}
-          <div className="pb-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <span>
-                <strong className="font-mono text-slate-800 dark:text-slate-200">
-                  {selectedTestCase.code}
-                </strong>{' '}
-                · v{selectedTestCase.version} · {selectedTestCase.author}
-              </span>
-              <span className="font-mono tabular-nums whitespace-nowrap shrink-0">
-                Pass Rate: {selectedTestCase.passRate}%
-              </span>
-            </div>
-            <div>
-              <label htmlFor="test-case-title-input" className="sr-only">
-                Test Case Title
-              </label>
-              <input
-                id="test-case-title-input"
-                type="text"
-                disabled={!canEdit}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm font-bold rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
-              />
-            </div>
+            {filteredActions.length === 0 &&
+              filteredSopModules.length === 0 && (
+                <EmptyState>Nothing matches “{librarySearch}”.</EmptyState>
+              )}
+          </div>
+        </Panel>
+
+        {/* WORKFLOW */}
+        <Panel
+          as="div"
+          title="Workflow"
+          description={
+            canEdit
+              ? 'Steps run top to bottom. Select a step to configure it; drag to reorder.'
+              : 'Steps run top to bottom. Select a step to inspect it.'
+          }
+          bodyClassName="p-3 space-y-3"
+        >
+          <div>
+            <label htmlFor="test-case-title-input" className="sr-only">
+              Test Case Title
+            </label>
+            <input
+              id="test-case-title-input"
+              type="text"
+              disabled={!canEdit}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={cn(inputClass, 'font-semibold')}
+            />
           </div>
 
-          {/* Validation Banner if errors/warnings exist */}
           {codeGenResult.issues.length > 0 && (
-            <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/70 space-y-1">
-              <div className="text-xs font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4" />
-                Workflow Diagnostics ({codeGenResult.issues.length})
+            <Notice tone="warn">
+              <div className="font-medium flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4" aria-hidden="true" />
+                {codeGenResult.issues.length} issue
+                {codeGenResult.issues.length === 1 ? '' : 's'} to fix before
+                this spec is valid
               </div>
-              <ul className="text-xs text-amber-800 dark:text-amber-300 space-y-0.5 pl-5 list-disc">
+              <ul className="mt-1 pl-5 list-disc space-y-0.5">
                 {codeGenResult.issues.map((iss, idx) => (
                   <li key={idx}>
-                    [{iss.severity.toUpperCase()}] {iss.message}
+                    {iss.stepIndex !== undefined &&
+                      `Step ${iss.stepIndex + 1}: `}
+                    {iss.message}
+                    {iss.severity === 'warning' && ' (warning)'}
                   </li>
                 ))}
               </ul>
-            </div>
+            </Notice>
           )}
 
-          {/* Drag-and-Drop Visual Workflow Step Nodes */}
-          <div
+          <ol
             data-testid="visual-workflow-canvas"
-            className="space-y-2.5 max-h-[560px] overflow-y-auto pr-1"
+            className="space-y-2 max-h-[640px] overflow-y-auto pr-1"
           >
             {steps.map((step, index) => {
               const isSelected = selectedStep?.id === step.id;
@@ -724,428 +804,480 @@ export default function VisualBuilderView({
                     : step.actionId;
 
               return (
-                <div
+                <li
                   key={step.id}
                   draggable={canEdit}
                   onDragStart={() => setDraggedStepIndex(index)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => handleDropStep(index)}
-                  onClick={() => setSelectedStepId(step.id)}
-                  className={`p-3 rounded-lg border transition-colors cursor-pointer ${
+                  className={cn(
+                    'rounded-md border transition-colors',
                     isSelected
-                      ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/30'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 hover:border-slate-300 dark:hover:border-slate-700'
-                  } ${!step.enabled ? 'opacity-50' : ''}`}
+                      ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/25'
+                      : stepIssues.length > 0
+                        ? 'border-amber-300 dark:border-amber-800'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700',
+                    !step.enabled && 'opacity-60'
+                  )}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2.5 min-w-0">
-                      <GripVertical className="w-4 h-4 text-slate-400 mt-0.5 shrink-0 cursor-grab" />
-                      <span className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono font-bold flex items-center justify-center shrink-0 tabular-nums">
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                          {step.label}
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-1.5 mt-0.5">
-                          <span className="font-mono text-blue-600 dark:text-blue-400">
-                            {entry?.category || 'step'}
-                          </span>
-                          <span>·</span>
-                          <code className="font-mono truncate max-w-[220px]">
-                            {locatorPreview}
-                          </code>
-                          {lineRange && (
-                            <>
-                              <span>·</span>
-                              <span className="font-mono text-slate-400 tabular-nums">
-                                L{lineRange.startLine}–{lineRange.endLine}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        {stepIssues.length > 0 && (
-                          <div className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium">
-                            {stepIssues[0].message}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Step Node Action Buttons */}
-                    <div
-                      className="flex items-center gap-1 shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        disabled={!canEdit || index === 0}
-                        aria-label={`Move step ${index + 1} up`}
-                        onClick={() => handleMoveStep(index, -1)}
-                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 disabled:opacity-30"
-                      >
-                        <ArrowUp className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!canEdit || index === steps.length - 1}
-                        aria-label={`Move step ${index + 1} down`}
-                        onClick={() => handleMoveStep(index, 1)}
-                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 disabled:opacity-30"
-                      >
-                        <ArrowDown className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!canEdit}
-                        aria-label={`Duplicate step ${index + 1}`}
-                        onClick={() => handleDuplicateStep(index)}
-                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 disabled:opacity-30"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!canEdit || steps.length <= 1}
-                        aria-label={`Delete step ${index + 1}`}
-                        onClick={() => handleRemoveStep(step.id)}
-                        className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-950/60 text-red-600 dark:text-red-400 disabled:opacity-30"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* RIGHT PANE: Step Configuration Form + Live Generated Playwright Code (4 cols) */}
-        <div className="lg:col-span-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-4">
-          {/* Mode Switcher */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
-            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-md">
-              <button
-                type="button"
-                onClick={() => setRightTab('split')}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
-                  rightTab === 'split'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                Split
-              </button>
-              <button
-                type="button"
-                onClick={() => setRightTab('config')}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
-                  rightTab === 'config'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                <Settings2 className="w-3 h-3 inline mr-1" />
-                Config
-              </button>
-              <button
-                type="button"
-                onClick={() => setRightTab('code')}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
-                  rightTab === 'code'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                <Code2 className="w-3 h-3 inline mr-1" />
-                Code
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowLocatorPicker((prev) => !prev)}
-              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 whitespace-nowrap shrink-0"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              {showLocatorPicker ? 'Hide Locators' : 'Target Locators'}
-            </button>
-          </div>
-
-          {/* Optional Target App Locator Assistant Drawer */}
-          {showLocatorPicker && (
-            <div className="p-3 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
-              <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                Click a Controlled Target App Locator to Bind to Current Step:
-              </div>
-              <div className="max-h-36 overflow-y-auto space-y-1">
-                {SAMPLE_TARGET_LOCATORS.map((item) => (
                   <button
-                    key={item.locator}
                     type="button"
-                    onClick={() => {
-                      if (!selectedStep) return;
-                      handleUpdateParameter(
-                        selectedStep.id,
-                        'locator',
-                        item.locator
-                      );
-                    }}
-                    className="w-full text-left px-2 py-1 rounded text-xs hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center justify-between gap-2"
+                    aria-pressed={isSelected}
+                    onClick={() => setSelectedStepId(step.id)}
+                    className="w-full text-left flex items-start gap-2.5 p-3"
                   >
-                    <code className="font-mono text-blue-600 dark:text-blue-400">
-                      {item.locator}
-                    </code>
-                    <span className="text-slate-500 dark:text-slate-400 truncate">
-                      {item.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* STEP CONFIGURATION FORM */}
-          {(rightTab === 'config' || rightTab === 'split') && selectedStep && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Step Configuration · {selectedActionSchema?.name || selectedStep.actionId}
-                </h3>
-                <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedStep.enabled}
-                    onChange={(e) =>
-                      handleUpdateStep(selectedStep.id, {
-                        enabled: e.target.checked,
-                      })
-                    }
-                    className="rounded border-slate-300"
-                  />
-                  Step Enabled
-                </label>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="step-label-input"
-                  className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
-                >
-                  Human-Readable Step Description
-                </label>
-                <input
-                  id="step-label-input"
-                  type="text"
-                  disabled={!canEdit}
-                  value={selectedStep.label}
-                  onChange={(e) =>
-                    handleUpdateStep(selectedStep.id, {label: e.target.value})
-                  }
-                  className="w-full px-3 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              {/* Schema-Driven Parameters */}
-              {selectedActionSchema?.parameters.map((param) => {
-                const rawVal = selectedStep.parameters[param.name] ?? param.defaultValue ?? '';
-                const inputId = `param-${selectedStep.id}-${param.name}`;
-
-                return (
-                  <div key={param.name}>
-                    <div className="flex items-center justify-between mb-1">
-                      <label
-                        htmlFor={inputId}
-                        className="text-xs font-medium text-slate-700 dark:text-slate-300"
-                      >
-                        {param.label}{' '}
-                        {param.required && (
-                          <span className="text-red-500">*</span>
-                        )}
-                      </label>
-                      {param.type === 'locator' && (
-                        <span className="text-xs font-mono text-slate-400">
-                          {formatPlaywrightLocator(String(rawVal))}
-                        </span>
-                      )}
-                    </div>
-
-                    {param.type === 'select' && param.options ? (
-                      <select
-                        id={inputId}
-                        disabled={!canEdit}
-                        value={String(rawVal)}
-                        onChange={(e) =>
-                          handleUpdateParameter(
-                            selectedStep.id,
-                            param.name,
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
-                      >
-                        {param.options.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : param.type === 'boolean' ? (
-                      <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-                        <input
-                          id={inputId}
-                          type="checkbox"
-                          disabled={!canEdit}
-                          checked={Boolean(rawVal)}
-                          onChange={(e) =>
-                            handleUpdateParameter(
-                              selectedStep.id,
-                              param.name,
-                              e.target.checked
-                            )
-                          }
-                          className="rounded border-slate-300"
-                        />
-                        <span>{param.description}</span>
-                      </label>
-                    ) : (
-                      <input
-                        id={inputId}
-                        type={param.type === 'number' ? 'number' : 'text'}
-                        disabled={!canEdit}
-                        placeholder={param.placeholder}
-                        value={String(rawVal)}
-                        onChange={(e) =>
-                          handleUpdateParameter(
-                            selectedStep.id,
-                            param.name,
-                            param.type === 'number'
-                              ? Number(e.target.value)
-                              : e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-1.5 text-xs font-mono rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+                    {canEdit && (
+                      <GripVertical
+                        className="w-4 h-4 text-slate-400 mt-0.5 shrink-0 cursor-grab"
+                        aria-hidden="true"
                       />
                     )}
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {param.description}
-                    </p>
-                  </div>
-                );
-              })}
+                    <span className="w-6 h-6 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-mono font-semibold flex items-center justify-center shrink-0 tabular-nums">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="text-sm font-medium text-slate-900 dark:text-white">
+                          {step.label}
+                        </span>
+                        {!step.enabled && (
+                          <Badge tone="neutral">Disabled</Badge>
+                        )}
+                      </span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        <span className="text-blue-700 dark:text-blue-400">
+                          {entry?.category || 'step'}
+                        </span>
+                        {lineRange && (
+                          <span className="font-mono tabular-nums text-slate-400">
+                            {' '}
+                            · lines {lineRange.startLine}–{lineRange.endLine}
+                          </span>
+                        )}
+                      </span>
+                      <code className="block font-mono text-xs text-slate-600 dark:text-slate-400 mt-0.5 break-all">
+                        {locatorPreview}
+                      </code>
+                      {stepIssues.length > 0 && (
+                        <span className="block text-xs text-amber-700 dark:text-amber-400 mt-1 font-medium">
+                          {stepIssues[0].message}
+                        </span>
+                      )}
+                    </span>
+                  </button>
 
-              {/* Quick Vault Secret Insertion Helper */}
-              {selectedStep.actionId === 'act.fill' && (
-                <div className="pt-1 flex items-center gap-2 text-xs">
-                  <span className="text-slate-500 dark:text-slate-400">
-                    Insert Encrypted Secret:
-                  </span>
-                  {state.secrets.map((sec) => (
-                    <button
-                      key={sec.id}
-                      type="button"
-                      onClick={() =>
-                        handleUpdateParameter(
-                          selectedStep.id,
-                          'value',
-                          `{{SECRET:${sec.key}}}`
-                        )
-                      }
-                      className="px-2 py-0.5 rounded font-mono bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      {`{{SECRET:${sec.key}}}`}
-                    </button>
+                  {isSelected && canEdit && (
+                    <div className="flex flex-wrap items-center gap-1 px-3 pb-2.5 -mt-1 ml-[3.75rem]">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={ArrowUp}
+                        disabled={index === 0}
+                        aria-label={`Move step ${index + 1} up`}
+                        onClick={() => handleMoveStep(index, -1)}
+                      >
+                        Up
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={ArrowDown}
+                        disabled={index === steps.length - 1}
+                        aria-label={`Move step ${index + 1} down`}
+                        onClick={() => handleMoveStep(index, 1)}
+                      >
+                        Down
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={Copy}
+                        aria-label={`Duplicate step ${index + 1}`}
+                        onClick={() => handleDuplicateStep(index)}
+                      >
+                        Duplicate
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={Trash2}
+                        disabled={steps.length <= 1}
+                        aria-label={`Delete step ${index + 1}`}
+                        onClick={() => handleRemoveStep(step.id)}
+                        className="text-red-700 dark:text-red-400"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </Panel>
+
+        {/* INSPECTOR */}
+        <Panel
+          as="div"
+          className="lg:col-span-2 2xl:col-span-1"
+          bodyClassName="p-0"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-2 px-4 pt-2">
+            <Tabs<'config' | 'code' | 'split'>
+              label="Inspector view"
+              value={rightTab}
+              onChange={setRightTab}
+              items={[
+                {
+                  id: 'split',
+                  label: 'Both',
+                },
+                {
+                  id: 'config',
+                  label: (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      Configure step
+                    </span>
+                  ),
+                },
+                {
+                  id: 'code',
+                  label: (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Code2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      Generated code
+                    </span>
+                  ),
+                },
+              ]}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={Eye}
+              aria-expanded={showLocatorPicker}
+              onClick={() => setShowLocatorPicker((prev) => !prev)}
+              className="mb-1"
+            >
+              {showLocatorPicker ? 'Hide locators' : 'Target locators'}
+            </Button>
+          </div>
+
+          {/* In "Both" mode, when the inspector spans the full row (lg–2xl),
+              settings and code sit side by side; otherwise they stack. */}
+          <div
+            className={cn(
+              'p-4 gap-6',
+              rightTab === 'split'
+                ? 'flex flex-col lg:grid lg:grid-cols-2 2xl:flex'
+                : 'flex flex-col'
+            )}
+          >
+            <div className="space-y-4 min-w-0">
+            {showLocatorPicker && (
+              <div className="rounded-md border border-slate-200 dark:border-slate-800">
+                <div className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                  Known elements in the target app. Select one to set it as
+                  the locator of step {selectedStep ? steps.indexOf(selectedStep) + 1 : '—'}.
+                </div>
+                <ul className="max-h-44 overflow-y-auto py-1">
+                  {SAMPLE_TARGET_LOCATORS.map((item) => (
+                    <li key={item.locator}>
+                      <button
+                        type="button"
+                        disabled={!canEdit || !selectedStep}
+                        onClick={() => {
+                          if (!selectedStep) return;
+                          handleUpdateParameter(
+                            selectedStep.id,
+                            'locator',
+                            item.locator
+                          );
+                        }}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-800/60 disabled:opacity-50"
+                      >
+                        <code className="block font-mono text-blue-700 dark:text-blue-400 break-all">
+                          {item.locator}
+                        </code>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {item.description}
+                        </span>
+                      </button>
+                    </li>
                   ))}
+                </ul>
+              </div>
+            )}
+
+            {(rightTab === 'config' || rightTab === 'split') &&
+              selectedStep && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                        Step {steps.indexOf(selectedStep) + 1}:{' '}
+                        {selectedActionSchema?.name || selectedStep.actionId}
+                      </h3>
+                      {selectedActionSchema?.description && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          {selectedActionSchema.description}
+                        </p>
+                      )}
+                    </div>
+                    <label className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedStep.enabled}
+                        disabled={!canEdit}
+                        onChange={(e) =>
+                          handleUpdateStep(selectedStep.id, {
+                            enabled: e.target.checked,
+                          })
+                        }
+                        className="w-4 h-4 rounded border-slate-300"
+                      />
+                      Enabled
+                    </label>
+                  </div>
+
+                  <Field
+                    label="Description shown in reports"
+                    htmlFor="step-label-input"
+                  >
+                    <input
+                      id="step-label-input"
+                      type="text"
+                      disabled={!canEdit}
+                      value={selectedStep.label}
+                      onChange={(e) =>
+                        handleUpdateStep(selectedStep.id, {
+                          label: e.target.value,
+                        })
+                      }
+                      className={inputClass}
+                    />
+                  </Field>
+
+                  {selectedActionSchema?.parameters.map((param) => {
+                    const rawVal =
+                      selectedStep.parameters[param.name] ??
+                      param.defaultValue ??
+                      '';
+                    const inputId = `param-${selectedStep.id}-${param.name}`;
+
+                    if (param.type === 'boolean') {
+                      return (
+                        <label
+                          key={param.name}
+                          htmlFor={inputId}
+                          className="flex items-start gap-2 text-[13px] text-slate-700 dark:text-slate-300"
+                        >
+                          <input
+                            id={inputId}
+                            type="checkbox"
+                            disabled={!canEdit}
+                            checked={Boolean(rawVal)}
+                            onChange={(e) =>
+                              handleUpdateParameter(
+                                selectedStep.id,
+                                param.name,
+                                e.target.checked
+                              )
+                            }
+                            className="w-4 h-4 mt-0.5 rounded border-slate-300"
+                          />
+                          <span>
+                            <span className="font-medium">{param.label}</span>
+                            <span className="block text-xs text-slate-500 dark:text-slate-400">
+                              {param.description}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    }
+
+                    return (
+                      <Field
+                        key={param.name}
+                        label={param.label}
+                        htmlFor={inputId}
+                        required={param.required}
+                        hint={param.description}
+                        aside={
+                          param.type === 'locator' && rawVal !== '' ? (
+                            <code className="text-[11px] font-mono text-slate-400 truncate max-w-[55%]">
+                              {formatPlaywrightLocator(String(rawVal))}
+                            </code>
+                          ) : undefined
+                        }
+                      >
+                        {param.type === 'select' && param.options ? (
+                          <select
+                            id={inputId}
+                            disabled={!canEdit}
+                            value={String(rawVal)}
+                            onChange={(e) =>
+                              handleUpdateParameter(
+                                selectedStep.id,
+                                param.name,
+                                e.target.value
+                              )
+                            }
+                            className={cn(selectClass, 'w-full')}
+                          >
+                            {param.options.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            id={inputId}
+                            type={param.type === 'number' ? 'number' : 'text'}
+                            disabled={!canEdit}
+                            placeholder={param.placeholder}
+                            value={String(rawVal)}
+                            onChange={(e) =>
+                              handleUpdateParameter(
+                                selectedStep.id,
+                                param.name,
+                                param.type === 'number'
+                                  ? Number(e.target.value)
+                                  : e.target.value
+                              )
+                            }
+                            className={cn(inputClass, 'font-mono')}
+                          />
+                        )}
+                      </Field>
+                    );
+                  })}
+
+                  {selectedStep.actionId === 'act.fill' &&
+                    state.secrets.length > 0 && (
+                      <div className="text-xs">
+                        <div className="text-slate-500 dark:text-slate-400 mb-1">
+                          Use a vault secret as the value (never written to
+                          the spec in plain text):
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {state.secrets.map((sec) => (
+                            <button
+                              key={sec.id}
+                              type="button"
+                              disabled={!canEdit}
+                              onClick={() =>
+                                handleUpdateParameter(
+                                  selectedStep.id,
+                                  'value',
+                                  `{{SECRET:${sec.key}}}`
+                                )
+                              }
+                              className="px-2 py-0.5 rounded font-mono bg-slate-100 dark:bg-slate-800 text-blue-700 dark:text-blue-400 hover:underline disabled:opacity-50"
+                            >
+                              {`{{SECRET:${sec.key}}}`}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                 </div>
               )}
             </div>
-          )}
 
-          {/* GENERATED PLAYWRIGHT TYPESCRIPT CODE PREVIEW */}
-          {(rightTab === 'code' || rightTab === 'split') && (
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                  Generated Playwright TypeScript
-                </div>
-                <span className="text-xs font-mono text-slate-400 whitespace-nowrap shrink-0">
-                  {selectedTestCase.code.toLowerCase()}.spec.ts
-                </span>
-              </div>
-
+            {(rightTab === 'code' || rightTab === 'split') && (
               <div
-                data-testid="generated-playwright-code"
-                className="rounded-md bg-slate-950 text-slate-100 border border-slate-800 p-3 font-mono text-xs overflow-x-auto max-h-[320px] overflow-y-auto"
+                className={cn(
+                  'space-y-2 min-w-0',
+                  rightTab === 'split' &&
+                    'pt-4 border-t border-slate-100 dark:border-slate-800 lg:pt-0 lg:border-t-0 2xl:pt-4 2xl:border-t'
+                )}
               >
-                {codeLines.map((line, idx) => {
-                  const lineNum = idx + 1;
-                  const isHighlighted =
-                    selectedStepRange &&
-                    lineNum >= selectedStepRange.startLine &&
-                    lineNum <= selectedStepRange.endLine;
-                  return (
-                    <div
-                      key={lineNum}
-                      className={`flex items-start gap-3 px-1.5 py-0.5 rounded ${
-                        isHighlighted
-                          ? 'bg-blue-900/50 text-blue-100'
-                          : 'text-slate-300'
-                      }`}
-                    >
-                      <span className="w-6 text-right text-slate-600 select-none tabular-nums shrink-0">
-                        {lineNum}
-                      </span>
-                      <span className="whitespace-pre">{line || ' '}</span>
-                    </div>
-                  );
-                })}
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-mono text-slate-600 dark:text-slate-300">
+                    {selectedTestCase.code.toLowerCase()}.spec.ts
+                  </span>
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {codeLines.length} lines
+                    {selectedStepRange &&
+                      ` · step highlighted at ${selectedStepRange.startLine}–${selectedStepRange.endLine}`}
+                  </span>
+                </div>
+                <div
+                  data-testid="generated-playwright-code"
+                  className="rounded-md bg-slate-950 text-slate-100 border border-slate-800 py-2 font-mono text-xs overflow-x-auto max-h-[420px] overflow-y-auto"
+                >
+                  {codeLines.map((line, idx) => {
+                    const lineNum = idx + 1;
+                    const isHighlighted =
+                      selectedStepRange &&
+                      lineNum >= selectedStepRange.startLine &&
+                      lineNum <= selectedStepRange.endLine;
+                    return (
+                      <div
+                        key={lineNum}
+                        className={cn(
+                          'flex items-start gap-3 px-3 leading-5',
+                          isHighlighted
+                            ? 'bg-blue-900/50 text-blue-50'
+                            : 'text-slate-300'
+                        )}
+                      >
+                        <span className="w-6 text-right text-slate-600 select-none tabular-nums shrink-0">
+                          {lineNum}
+                        </span>
+                        <span className="whitespace-pre">{line || ' '}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </Panel>
       </div>
 
-      {/* Create New Test Case Modal */}
+      {/* New test case dialog */}
       {showNewTestModal && (
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="new-test-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowNewTestModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
         >
-          <div className="w-full max-w-md rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-            <h2
-              id="new-test-modal-title"
-              className="text-base font-bold text-slate-900 dark:text-white"
-            >
-              Create Visual Playwright Test Case
-            </h2>
+          <div className="w-full max-w-md rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-xl">
+            <div>
+              <h2
+                id="new-test-modal-title"
+                className="text-base font-semibold text-slate-900 dark:text-white"
+              >
+                New test case
+              </h2>
+              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">
+                Created in the same project and suite as{' '}
+                {selectedTestCase.code}, starting with two steps: open the
+                target app and check its welcome banner.
+              </p>
+            </div>
             <form onSubmit={handleCreateNewTest} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="new-tc-title"
-                  className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
-                >
-                  Test Case Title *
-                </label>
+              <Field label="Title" htmlFor="new-tc-title" required>
                 <input
                   id="new-tc-title"
                   type="text"
                   required
-                  placeholder="e.g. Verify Multi-Item Procurement Approval"
+                  autoFocus
+                  placeholder="e.g. Verify multi-item procurement approval"
                   value={newTestTitle}
                   onChange={(e) => setNewTestTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+                  className={inputClass}
                 />
-              </div>
-              <div>
-                <label
-                  htmlFor="new-tc-priority"
-                  className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
-                >
-                  Priority
-                </label>
+              </Field>
+              <Field label="Priority" htmlFor="new-tc-priority">
                 <select
                   id="new-tc-priority"
                   value={newTestPriority}
@@ -1154,28 +1286,24 @@ export default function VisualBuilderView({
                       e.target.value as 'critical' | 'high' | 'medium' | 'low'
                     )
                   }
-                  className="w-full px-3 py-2 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+                  className={cn(selectClass, 'w-full')}
                 >
                   <option value="critical">Critical</option>
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
                 </select>
-              </div>
+              </Field>
               <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() => setShowNewTestModal(false)}
-                  className="px-4 py-2 text-xs font-medium rounded-md border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-500"
-                >
-                  Create & Open in Builder
-                </button>
+                </Button>
+                <Button type="submit" variant="primary">
+                  Create and open
+                </Button>
               </div>
             </form>
           </div>
