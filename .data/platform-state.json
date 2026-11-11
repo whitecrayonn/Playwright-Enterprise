@@ -1,0 +1,1716 @@
+{
+  "workspaces": [
+    {
+      "id": "ws-enterprise-01",
+      "name": "Acme Global Quality Engineering",
+      "slug": "acme-global-qe",
+      "tier": "Enterprise Multi-Tenant"
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj-acme-cloud",
+      "workspaceId": "ws-enterprise-01",
+      "key": "ACME",
+      "name": "Acme Cloud Commerce",
+      "description": "Enterprise B2B procurement portal, order workflows, and inventory management.",
+      "defaultEnvironment": "Staging (Controlled Target)",
+      "concurrencyLimit": 8,
+      "workerPool": "core-linux-pool",
+      "artifactRetentionDays": 30,
+      "createdAt": "2026-09-01T08:00:00Z",
+      "environments": [
+        {
+          "id": "env-staging",
+          "name": "Staging (Controlled Target)",
+          "slug": "staging",
+          "baseUrl": "http://localhost:3000",
+          "variables": {
+            "PORTAL_PATH": "/sample-app",
+            "DEFAULT_LOCALE": "en-US"
+          },
+          "defaultRetries": 1,
+          "timeoutMs": 30000
+        },
+        {
+          "id": "env-prod-canary",
+          "name": "Production Canary",
+          "slug": "prod-canary",
+          "baseUrl": "https://canary.acme-commerce.internal",
+          "variables": {
+            "PORTAL_PATH": "/sample-app",
+            "DEFAULT_LOCALE": "en-US"
+          },
+          "defaultRetries": 2,
+          "timeoutMs": 45000
+        }
+      ]
+    },
+    {
+      "id": "proj-finledger",
+      "workspaceId": "ws-enterprise-01",
+      "key": "FINL",
+      "name": "FinLedger Core Banking",
+      "description": "Real-time wire settlement, treasury approvals, and compliance reconciliation.",
+      "defaultEnvironment": "QA Sandbox",
+      "concurrencyLimit": 6,
+      "workerPool": "high-mem-pool",
+      "artifactRetentionDays": 90,
+      "createdAt": "2026-09-15T10:00:00Z",
+      "environments": [
+        {
+          "id": "env-fin-qa",
+          "name": "QA Sandbox",
+          "slug": "qa-sandbox",
+          "baseUrl": "http://localhost:3000",
+          "variables": {
+            "LEDGER_MODE": "STRICT"
+          },
+          "defaultRetries": 2,
+          "timeoutMs": 60000
+        }
+      ]
+    }
+  ],
+  "testPlans": [
+    {
+      "id": "tp-release-2026-4",
+      "name": "Release 2026.4 Master Sign-Off Plan",
+      "description": "Mandatory pre-release regression and smoke verification plan for Acme Cloud Commerce.",
+      "projectId": "proj-acme-cloud",
+      "targetRelease": "v2026.4.0-rc2",
+      "scheduleCron": "0 */6 * * *"
+    },
+    {
+      "id": "tp-fin-q4",
+      "name": "Q4 Regulatory Settlement Audit Plan",
+      "description": "Automated compliance checks for wire transfers and batch reconciliation.",
+      "projectId": "proj-finledger",
+      "targetRelease": "v9.12.0",
+      "scheduleCron": "0 2 * * *"
+    }
+  ],
+  "testSuites": [
+    {
+      "id": "ts-checkout-e2e",
+      "name": "Procurement & Order Approval Suite",
+      "description": "End-to-end order lifecycle, SSO authentication, and supervisor sign-off.",
+      "projectId": "proj-acme-cloud",
+      "testPlanId": "tp-release-2026-4",
+      "tags": [
+        "smoke",
+        "critical-path"
+      ],
+      "parallelism": 4
+    },
+    {
+      "id": "ts-inventory-grid",
+      "name": "Inventory Catalog & Search Filtering Suite",
+      "description": "Data grid filtering, sorting, and stock count assertions.",
+      "projectId": "proj-acme-cloud",
+      "testPlanId": "tp-release-2026-4",
+      "tags": [
+        "regression",
+        "ui-grid"
+      ],
+      "parallelism": 2
+    },
+    {
+      "id": "ts-fin-settlement",
+      "name": "Core Settlement Reconciliation Suite",
+      "description": "High-priority ledger settlement checks.",
+      "projectId": "proj-finledger",
+      "testPlanId": "tp-fin-q4",
+      "tags": [
+        "compliance",
+        "settlement"
+      ],
+      "parallelism": 2
+    }
+  ],
+  "testCases": [
+    {
+      "id": "tc-101",
+      "code": "ACME-TC-101",
+      "title": "E2E Procurement Order Creation & Supervisor Approval",
+      "description": "Validates complete SSO login via SOP module, order quantity entry, expedited shipping toggle, approval assertion, and order ID extraction against /sample-app.",
+      "workspaceId": "ws-enterprise-01",
+      "projectId": "proj-acme-cloud",
+      "testPlanId": "tp-release-2026-4",
+      "testSuiteId": "ts-checkout-e2e",
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "smoke",
+        "e2e",
+        "procurement"
+      ],
+      "version": 4,
+      "versionHistory": [
+        {
+          "version": 4,
+          "updatedAt": "2026-11-10T16:30:00Z",
+          "author": "Elena Vance",
+          "summary": "Added variable extraction for capturedOrderCode and evidence screenshot.",
+          "stepCount": 10
+        },
+        {
+          "version": 3,
+          "updatedAt": "2026-11-05T11:15:00Z",
+          "author": "Jordan Rivera (Manual QA)",
+          "summary": "Replaced manual login steps with Enterprise SSO Login SOP v2.4.0.",
+          "stepCount": 8
+        }
+      ],
+      "author": "Jordan Rivera (Manual QA)",
+      "targetEnvironment": "Staging (Controlled Target)",
+      "browsers": [
+        "chromium",
+        "firefox"
+      ],
+      "steps": [
+        {
+          "id": "step-101",
+          "actionId": "nav.goto",
+          "label": "Navigate to Controlled Sample Portal",
+          "enabled": true,
+          "parameters": {
+            "url": "/sample-app",
+            "waitUntil": "domcontentloaded"
+          },
+          "timeoutMs": 10000
+        },
+        {
+          "id": "step-102",
+          "actionId": "nav.viewport",
+          "label": "Configure Desktop 1440x900 Viewport",
+          "enabled": true,
+          "parameters": {
+            "width": 1440,
+            "height": 900
+          }
+        },
+        {
+          "id": "step-103",
+          "actionId": "logic.subflow",
+          "label": "Execute SOP: Enterprise SSO Login",
+          "enabled": true,
+          "sopModuleId": "sop-sso-login",
+          "sopModuleVersion": "2.4.0",
+          "parameters": {
+            "sopSlug": "enterprise-sso-login",
+            "sopArgsJson": "{\"username\":\"qa.lead@acme.io\",\"role\":\"Supervisor\"}"
+          }
+        },
+        {
+          "id": "step-104",
+          "actionId": "assert.visible",
+          "label": "Verify Welcome Banner Is Visible",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=dashboard-welcome-banner",
+            "shouldBeVisible": true
+          }
+        },
+        {
+          "id": "step-105",
+          "actionId": "act.fill",
+          "label": "Set Order Quantity to 5 Units",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=quantity-input",
+            "value": "5",
+            "clearFirst": true
+          }
+        },
+        {
+          "id": "step-106",
+          "actionId": "act.check",
+          "label": "Check Expedited Shipping Option",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=expedited-shipping-checkbox",
+            "checked": true
+          }
+        },
+        {
+          "id": "step-107",
+          "actionId": "act.click",
+          "label": "Click Submit Order Button",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=create-order-submit",
+            "clickType": "single"
+          }
+        },
+        {
+          "id": "step-108",
+          "actionId": "assert.text",
+          "label": "Assert Order Status Badge Reads Approved & Dispatched",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=order-status-badge",
+            "expectedText": "Approved & Dispatched",
+            "matchMode": "contains"
+          }
+        },
+        {
+          "id": "step-109",
+          "actionId": "logic.setVariable",
+          "label": "Capture Generated Order ID into Variable",
+          "enabled": true,
+          "variableOutput": "capturedOrderCode",
+          "parameters": {
+            "variableName": "capturedOrderCode",
+            "sourceType": "locatorText",
+            "sourceValue": "testid=latest-order-id"
+          }
+        },
+        {
+          "id": "step-110",
+          "actionId": "adv.captureScreenshot",
+          "label": "Capture Order Confirmation Evidence Screenshot",
+          "enabled": true,
+          "parameters": {
+            "artifactName": "order-approved-confirmation.png",
+            "fullPage": true
+          }
+        }
+      ],
+      "dataDrivenRows": [
+        {
+          "orderQty": "5",
+          "department": "Cloud Infrastructure"
+        },
+        {
+          "orderQty": "12",
+          "department": "Security Operations"
+        }
+      ],
+      "createdAt": "2026-10-12T09:00:00Z",
+      "updatedAt": "2026-11-10T16:30:00Z",
+      "flakyScore": 4,
+      "passRate": 100,
+      "avgDurationMs": 1668,
+      "totalRuns": 46
+    },
+    {
+      "id": "tc-102",
+      "code": "ACME-TC-102",
+      "title": "Inventory Catalog Category Filtering & Row Count Verification",
+      "description": "Verifies initial 4 inventory rows in the controlled target portal, filters by Hardware category, and asserts 2 matching rows.",
+      "workspaceId": "ws-enterprise-01",
+      "projectId": "proj-acme-cloud",
+      "testPlanId": "tp-release-2026-4",
+      "testSuiteId": "ts-inventory-grid",
+      "status": "active",
+      "priority": "high",
+      "tags": [
+        "regression",
+        "inventory",
+        "grid"
+      ],
+      "version": 2,
+      "versionHistory": [
+        {
+          "version": 2,
+          "updatedAt": "2026-11-09T10:00:00Z",
+          "author": "Priya Nair",
+          "summary": "Added supervisor approval aria-pressed attribute assertion.",
+          "stepCount": 5
+        }
+      ],
+      "author": "Priya Nair",
+      "targetEnvironment": "Staging (Controlled Target)",
+      "browsers": [
+        "chromium",
+        "webkit"
+      ],
+      "steps": [
+        {
+          "id": "step-201",
+          "actionId": "nav.goto",
+          "label": "Open Controlled Sample Portal",
+          "enabled": true,
+          "parameters": {
+            "url": "/sample-app",
+            "waitUntil": "domcontentloaded"
+          }
+        },
+        {
+          "id": "step-202",
+          "actionId": "assert.count",
+          "label": "Verify Default Inventory Table Shows 4 Items",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=inventory-row",
+            "expectedCount": 4
+          }
+        },
+        {
+          "id": "step-203",
+          "actionId": "act.selectOption",
+          "label": "Filter Inventory by Hardware Category",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=category-filter-select",
+            "optionValue": "Hardware"
+          }
+        },
+        {
+          "id": "step-204",
+          "actionId": "assert.count",
+          "label": "Assert Filtered Hardware Row Count Equals 2",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=inventory-row",
+            "expectedCount": 2
+          }
+        },
+        {
+          "id": "step-205",
+          "actionId": "assert.attribute",
+          "label": "Verify Supervisor Approval Toggle Is Active",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=approval-toggle-btn",
+            "attributeName": "aria-pressed",
+            "expectedValue": "true"
+          }
+        }
+      ],
+      "dataDrivenRows": [],
+      "createdAt": "2026-10-18T14:00:00Z",
+      "updatedAt": "2026-11-09T10:00:00Z",
+      "flakyScore": 2,
+      "passRate": 100,
+      "avgDurationMs": 1120,
+      "totalRuns": 32
+    },
+    {
+      "id": "tc-103",
+      "code": "ACME-TC-103",
+      "title": "API Health Readiness & Conditional MFA Banner Dismissal",
+      "description": "Combines direct Playwright request API verification with conditional DOM branch execution on the sample portal.",
+      "workspaceId": "ws-enterprise-01",
+      "projectId": "proj-acme-cloud",
+      "testPlanId": "tp-release-2026-4",
+      "testSuiteId": "ts-checkout-e2e",
+      "status": "active",
+      "priority": "medium",
+      "tags": [
+        "api",
+        "hybrid",
+        "security"
+      ],
+      "version": 1,
+      "versionHistory": [
+        {
+          "version": 1,
+          "updatedAt": "2026-11-08T15:45:00Z",
+          "author": "Marcus Chen",
+          "summary": "Initial hybrid API + UI conditional workflow.",
+          "stepCount": 4
+        }
+      ],
+      "author": "Marcus Chen",
+      "targetEnvironment": "Staging (Controlled Target)",
+      "browsers": [
+        "chromium"
+      ],
+      "steps": [
+        {
+          "id": "step-301",
+          "actionId": "nav.goto",
+          "label": "Open Controlled Sample Portal",
+          "enabled": true,
+          "parameters": {
+            "url": "/sample-app",
+            "waitUntil": "domcontentloaded"
+          }
+        },
+        {
+          "id": "step-302",
+          "actionId": "adv.apiRequest",
+          "label": "Verify Platform Health API Status 200",
+          "enabled": true,
+          "parameters": {
+            "method": "GET",
+            "endpoint": "/api/platform",
+            "expectedStatus": 200
+          }
+        },
+        {
+          "id": "step-303",
+          "actionId": "logic.ifBranch",
+          "label": "Dismiss Optional MFA Security Banner If Present",
+          "enabled": true,
+          "parameters": {
+            "conditionLocator": "testid=mfa-challenge-banner",
+            "thenActionLocator": "testid=acknowledge-banner-btn"
+          }
+        },
+        {
+          "id": "step-304",
+          "actionId": "assert.url",
+          "label": "Verify URL Remains on Controlled Sample App",
+          "enabled": true,
+          "parameters": {
+            "targetProperty": "url",
+            "expectedPattern": "/sample-app"
+          }
+        }
+      ],
+      "dataDrivenRows": [],
+      "createdAt": "2026-11-08T15:45:00Z",
+      "updatedAt": "2026-11-08T15:45:00Z",
+      "flakyScore": 0,
+      "passRate": 100,
+      "avgDurationMs": 960,
+      "totalRuns": 19
+    },
+    {
+      "id": "tc-201",
+      "code": "FINL-TC-201",
+      "title": "Cross-Border Settlement Batch Status Assertion (Negative / Failure Demo)",
+      "description": "Demonstrates failure capture, Playwright stack trace diagnostics, and deduplicated Jira ticket creation when expected settlement status text differs.",
+      "workspaceId": "ws-enterprise-01",
+      "projectId": "proj-finledger",
+      "testPlanId": "tp-fin-q4",
+      "testSuiteId": "ts-fin-settlement",
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "settlement",
+        "flaky-watch",
+        "compliance"
+      ],
+      "version": 3,
+      "versionHistory": [
+        {
+          "version": 3,
+          "updatedAt": "2026-11-10T08:00:00Z",
+          "author": "Elena Vance",
+          "summary": "Strict exact match on settlement status badge.",
+          "stepCount": 3
+        }
+      ],
+      "author": "Elena Vance",
+      "targetEnvironment": "QA Sandbox",
+      "browsers": [
+        "chromium",
+        "firefox"
+      ],
+      "steps": [
+        {
+          "id": "step-401",
+          "actionId": "nav.goto",
+          "label": "Navigate to FinLedger Settlement Portal",
+          "enabled": true,
+          "parameters": {
+            "url": "/sample-app",
+            "waitUntil": "domcontentloaded"
+          }
+        },
+        {
+          "id": "step-402",
+          "actionId": "sync.waitForResponse",
+          "label": "Wait for Settlement Batch Webhook Response",
+          "enabled": true,
+          "parameters": {
+            "urlSubstring": "/api/platform",
+            "expectedStatus": 200
+          }
+        },
+        {
+          "id": "step-403",
+          "actionId": "assert.text",
+          "label": "Verify Settlement Batch Reconciled Status",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=order-status-badge",
+            "expectedText": "Batch Settlement Completed #99",
+            "matchMode": "exact"
+          }
+        }
+      ],
+      "dataDrivenRows": [],
+      "createdAt": "2026-10-25T11:00:00Z",
+      "updatedAt": "2026-11-10T08:00:00Z",
+      "flakyScore": 28,
+      "passRate": 71.4,
+      "avgDurationMs": 2150,
+      "totalRuns": 28
+    }
+  ],
+  "sopModules": [
+    {
+      "id": "sop-sso-login",
+      "name": "Enterprise SSO Login & Session Bootstrap",
+      "slug": "enterprise-sso-login",
+      "description": "Executes standardized corporate login against Acme Cloud Portal, handles optional MFA banner acknowledgement, and verifies session readiness.",
+      "version": "2.4.0",
+      "availableVersions": [
+        "2.4.0",
+        "2.3.1",
+        "2.0.0"
+      ],
+      "category": "Authentication",
+      "ownerRole": "automation_engineer",
+      "author": "Elena Vance (Staff SDET)",
+      "inputParameters": [
+        {
+          "name": "username",
+          "label": "Corporate Email",
+          "type": "string",
+          "required": true,
+          "defaultValue": "qa.lead@acme.io",
+          "description": "Target user account email."
+        },
+        {
+          "name": "role",
+          "label": "Expected Role",
+          "type": "string",
+          "required": false,
+          "defaultValue": "Supervisor",
+          "description": "RBAC role displayed in the portal header."
+        }
+      ],
+      "outputParameters": [
+        "authenticatedSessionId"
+      ],
+      "steps": [
+        {
+          "id": "sop-step-1",
+          "actionId": "act.fill",
+          "label": "Enter Corporate Email",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=login-email-input",
+            "value": "qa.lead@acme.io",
+            "clearFirst": true
+          }
+        },
+        {
+          "id": "sop-step-2",
+          "actionId": "act.fill",
+          "label": "Enter Encrypted Vault Password",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=login-password-input",
+            "value": "{{SECRET:ACME_SSO_PASSWORD}}",
+            "clearFirst": true
+          }
+        },
+        {
+          "id": "sop-step-3",
+          "actionId": "act.click",
+          "label": "Click Sign In Button",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=login-submit-btn",
+            "clickType": "single"
+          }
+        }
+      ],
+      "compatibleProjects": [
+        "proj-acme-cloud",
+        "proj-finledger"
+      ],
+      "repoReference": "git@github.com:acme-org/playwright-sop-library.git#v2.4.0",
+      "validationStatus": "verified",
+      "usageCount": 38,
+      "updatedAt": "2026-11-09T14:20:00Z",
+      "changelog": "v2.4.0: Migrated to semantic getByTestId locators and secret vault references."
+    },
+    {
+      "id": "sop-order-approval",
+      "name": "Procurement Order Creation & Supervisor Approval",
+      "slug": "procurement-order-approval",
+      "description": "Selects hardware inventory, sets order quantity, enables expedited shipping, and triggers supervisor approval assertion.",
+      "version": "1.8.0",
+      "availableVersions": [
+        "1.8.0",
+        "1.7.0"
+      ],
+      "category": "Business Workflow",
+      "ownerRole": "automation_engineer",
+      "author": "Marcus Chen (Lead QA Architect)",
+      "inputParameters": [
+        {
+          "name": "quantity",
+          "label": "Order Quantity",
+          "type": "number",
+          "required": true,
+          "defaultValue": "5",
+          "description": "Units to request."
+        }
+      ],
+      "outputParameters": [
+        "capturedOrderCode"
+      ],
+      "steps": [
+        {
+          "id": "sop-ord-1",
+          "actionId": "act.fill",
+          "label": "Set Order Quantity",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=quantity-input",
+            "value": "5",
+            "clearFirst": true
+          }
+        },
+        {
+          "id": "sop-ord-2",
+          "actionId": "act.check",
+          "label": "Enable Expedited Shipping",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=expedited-shipping-checkbox",
+            "checked": true
+          }
+        },
+        {
+          "id": "sop-ord-3",
+          "actionId": "act.click",
+          "label": "Submit Order Approval",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=create-order-submit",
+            "clickType": "single"
+          }
+        }
+      ],
+      "compatibleProjects": [
+        "proj-acme-cloud"
+      ],
+      "repoReference": "git@github.com:acme-org/playwright-sop-library.git#v1.8.0",
+      "validationStatus": "verified",
+      "usageCount": 24,
+      "updatedAt": "2026-11-08T09:15:00Z",
+      "changelog": "v1.8.0: Added explicit auto-wait before order confirmation toast check."
+    },
+    {
+      "id": "sop-table-audit",
+      "name": "Inventory Grid Filter & Row Count Verification",
+      "slug": "inventory-grid-audit",
+      "description": "Filters a data grid by category dropdown and validates matching row counts and cell values.",
+      "version": "1.3.2",
+      "availableVersions": [
+        "1.3.2",
+        "1.2.0"
+      ],
+      "category": "Table Validation",
+      "ownerRole": "automation_engineer",
+      "author": "Priya Nair (Senior SDET)",
+      "inputParameters": [
+        {
+          "name": "category",
+          "label": "Filter Category",
+          "type": "string",
+          "required": true,
+          "defaultValue": "Hardware",
+          "description": "Category option to select."
+        }
+      ],
+      "outputParameters": [
+        "rowCount"
+      ],
+      "steps": [
+        {
+          "id": "sop-tbl-1",
+          "actionId": "act.selectOption",
+          "label": "Select Category Filter",
+          "enabled": true,
+          "parameters": {
+            "locator": "testid=category-filter-select",
+            "optionValue": "Hardware"
+          }
+        }
+      ],
+      "compatibleProjects": [
+        "proj-acme-cloud",
+        "proj-finledger",
+        "proj-medvault"
+      ],
+      "repoReference": "git@github.com:acme-org/playwright-sop-library.git#v1.3.2",
+      "validationStatus": "verified",
+      "usageCount": 51,
+      "updatedAt": "2026-11-07T18:00:00Z",
+      "changelog": "v1.3.2: Added support for virtualized table rows."
+    }
+  ],
+  "workers": [
+    {
+      "id": "worker-us-east-01",
+      "name": "pw-runner-us-east-01",
+      "pool": "core-linux-pool",
+      "host": "10.42.10.14",
+      "containerId": "docker://9f82c1a4b01e",
+      "status": "online",
+      "maxConcurrency": 4,
+      "activeJobs": 0,
+      "supportedBrowsers": [
+        "chromium",
+        "firefox",
+        "webkit"
+      ],
+      "cpuUsagePercent": 18,
+      "memoryUsageMb": 1120,
+      "maxMemoryMb": 8192,
+      "lastHeartbeatAt": "2026-11-11T04:05:59.028Z",
+      "uptimeSeconds": 412800,
+      "totalExecuted": 843,
+      "errorCount": 1,
+      "currentExecutionIds": [],
+      "recentLogs": [
+        "[04:05:59] Completed EX-1005 (ACME-TC-101) -> PASSED in 1525ms",
+        "[19:38:00] Heartbeat OK — Playwright 1.50.0 container healthy (chromium, firefox, webkit ready)",
+        "[19:35:14] Completed execution EX-1004 in 1,810ms (exitCode=0)"
+      ]
+    },
+    {
+      "id": "worker-us-east-02",
+      "name": "pw-runner-us-east-02",
+      "pool": "core-linux-pool",
+      "host": "10.42.10.15",
+      "containerId": "docker://3d71e8c9a22f",
+      "status": "online",
+      "maxConcurrency": 4,
+      "activeJobs": 0,
+      "supportedBrowsers": [
+        "chromium",
+        "firefox",
+        "webkit"
+      ],
+      "cpuUsagePercent": 24,
+      "memoryUsageMb": 1480,
+      "maxMemoryMb": 8192,
+      "lastHeartbeatAt": "2026-11-10T19:38:02Z",
+      "uptimeSeconds": 389100,
+      "totalExecuted": 791,
+      "errorCount": 0,
+      "currentExecutionIds": [],
+      "recentLogs": [
+        "[19:38:02] Heartbeat OK — Worker pool slot capacity 4/4 available",
+        "[19:32:09] Uploaded trace bundle trace-EX-1003.zip to persistent object store"
+      ]
+    },
+    {
+      "id": "worker-eu-west-01",
+      "name": "pw-runner-eu-west-01",
+      "pool": "high-mem-pool",
+      "host": "10.88.4.21",
+      "containerId": "docker://7c11b3e0f99d",
+      "status": "online",
+      "maxConcurrency": 6,
+      "activeJobs": 0,
+      "supportedBrowsers": [
+        "chromium",
+        "firefox"
+      ],
+      "cpuUsagePercent": 15,
+      "memoryUsageMb": 2150,
+      "maxMemoryMb": 16384,
+      "lastHeartbeatAt": "2026-11-10T19:38:01Z",
+      "uptimeSeconds": 604800,
+      "totalExecuted": 1205,
+      "errorCount": 3,
+      "currentExecutionIds": [],
+      "recentLogs": [
+        "[19:38:01] Heartbeat OK — Isolated network namespace verified",
+        "[19:29:44] Execution EX-1002 failed assertion at step 3 (trace preserved)"
+      ]
+    },
+    {
+      "id": "worker-apac-01",
+      "name": "pw-runner-apac-01",
+      "pool": "core-linux-pool",
+      "host": "10.112.8.09",
+      "containerId": "docker://5a09d2f4e11b",
+      "status": "draining",
+      "maxConcurrency": 4,
+      "activeJobs": 0,
+      "supportedBrowsers": [
+        "chromium",
+        "webkit"
+      ],
+      "cpuUsagePercent": 8,
+      "memoryUsageMb": 890,
+      "maxMemoryMb": 8192,
+      "lastHeartbeatAt": "2026-11-10T19:37:55Z",
+      "uptimeSeconds": 172400,
+      "totalExecuted": 310,
+      "errorCount": 0,
+      "currentExecutionIds": [],
+      "recentLogs": [
+        "[19:30:00] Worker placed in DRAINING mode by Platform Admin for kernel image upgrade"
+      ]
+    }
+  ],
+  "executions": [
+    {
+      "id": "EX-1005",
+      "runNumber": 1005,
+      "workspaceId": "ws-enterprise-01",
+      "projectId": "proj-acme-cloud",
+      "testPlanId": "tp-release-2026-4",
+      "testSuiteId": "ts-checkout-e2e",
+      "testCaseId": "tc-101",
+      "testCaseCode": "ACME-TC-101",
+      "testCaseTitle": "E2E Procurement Order Creation & Supervisor Approval",
+      "triggerSource": "manual",
+      "triggeredBy": "Platform Administrator",
+      "triggeredByRole": "platform_admin",
+      "environmentName": "Staging (Controlled Target)",
+      "baseUrl": "http://localhost:3000",
+      "browser": "chromium",
+      "workerId": "worker-us-east-01",
+      "workerName": "pw-runner-us-east-01",
+      "status": "passed",
+      "retryAttempt": 0,
+      "maxRetries": 1,
+      "queuedAt": "2026-11-11T04:05:59.028Z",
+      "startedAt": "2026-11-11T04:05:59.028Z",
+      "completedAt": "2026-11-11T04:06:00.556Z",
+      "durationMs": 1525,
+      "queueWaitMs": 85,
+      "passedSteps": 10,
+      "failedSteps": 0,
+      "skippedSteps": 0,
+      "totalSteps": 10,
+      "stepResults": [
+        {
+          "stepId": "step-101",
+          "stepIndex": 0,
+          "actionId": "nav.goto",
+          "label": "Navigate to Controlled Sample Portal",
+          "status": "passed",
+          "durationMs": 210,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "await page.goto('/sample-app', { waitUntil: 'domcontentloaded' });",
+          "locatorResolved": "page",
+          "actualValue": "HTTP 200 (/sample-app)",
+          "expectedValue": "/sample-app",
+          "logLines": [
+            "Navigated to /sample-app and awaited domcontentloaded."
+          ],
+          "domSnapshotSnippet": "<main data-testid=\"sample-app-root\" data-url=\"/sample-app\"><h1>Acme Cloud Portal — Controlled QA Target App</h1></main>"
+        },
+        {
+          "stepId": "step-102",
+          "stepIndex": 1,
+          "actionId": "nav.viewport",
+          "label": "Configure Desktop 1440x900 Viewport",
+          "status": "passed",
+          "durationMs": 65,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "await page.setViewportSize({ width: 1440, height: 900 });",
+          "locatorResolved": "page.viewportSize()",
+          "actualValue": "1440x900",
+          "expectedValue": "1440x900",
+          "logLines": [
+            "Viewport resized to 1440x900px."
+          ],
+          "domSnapshotSnippet": "<body style=\"width:1440px;height:900px\">"
+        },
+        {
+          "stepId": "step-103",
+          "stepIndex": 2,
+          "actionId": "logic.subflow",
+          "label": "Execute SOP: Enterprise SSO Login",
+          "status": "passed",
+          "durationMs": 340,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "await runSop_enterprise_sso_login(page, {\"username\":\"qa.lead@acme.io\",\"role\":\"Supervisor\"});",
+          "locatorResolved": "SOP Module: Enterprise SSO Login & Session Bootstrap (v2.4.0)",
+          "actualValue": "Executed 3 encapsulated SOP steps",
+          "expectedValue": "SOP Module Success",
+          "logLines": [
+            "Invoked shared SOP module \"enterprise-sso-login\" without code duplication.",
+            "All internal SOP preconditions and locators succeeded."
+          ],
+          "domSnapshotSnippet": "<header data-testid=\"authenticated-user\">qa.lead@acme.io · Supervisor</header>"
+        },
+        {
+          "stepId": "step-104",
+          "stepIndex": 3,
+          "actionId": "assert.visible",
+          "label": "Verify Welcome Banner Is Visible",
+          "status": "passed",
+          "durationMs": 130,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "// Assert Element Visibility: Verify Welcome Banner Is Visible",
+          "locatorResolved": "page.getByTestId('dashboard-welcome-banner')",
+          "actualValue": "Verified OK",
+          "expectedValue": "Verified OK",
+          "logLines": [
+            "Executed Assert Element Visibility successfully."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"dashboard-welcome-banner\">Acme Cloud Portal Ready</div>"
+        },
+        {
+          "stepId": "step-105",
+          "stepIndex": 4,
+          "actionId": "act.fill",
+          "label": "Set Order Quantity to 5 Units",
+          "status": "passed",
+          "durationMs": 145,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "await page.getByTestId('quantity-input').fill('5');",
+          "locatorResolved": "page.getByTestId('quantity-input')",
+          "actualValue": "5",
+          "expectedValue": "5",
+          "logLines": [
+            "Cleared and filled page.getByTestId('quantity-input') with \"5\"."
+          ],
+          "domSnapshotSnippet": "<input data-testid=\"quantity-input\" value=\"5\" />"
+        },
+        {
+          "stepId": "step-106",
+          "stepIndex": 5,
+          "actionId": "act.check",
+          "label": "Check Expedited Shipping Option",
+          "status": "passed",
+          "durationMs": 120,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "await page.getByTestId('expedited-shipping-checkbox').check();",
+          "locatorResolved": "page.getByTestId('expedited-shipping-checkbox')",
+          "actualValue": "checked=true",
+          "expectedValue": "checked=true",
+          "logLines": [
+            "Checkbox state set to true."
+          ],
+          "domSnapshotSnippet": "<input type=\"checkbox\" data-testid=\"expedited-shipping-checkbox\" checked />"
+        },
+        {
+          "stepId": "step-107",
+          "stepIndex": 6,
+          "actionId": "act.click",
+          "label": "Click Submit Order Button",
+          "status": "passed",
+          "durationMs": 160,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "await page.getByTestId('create-order-submit').click();",
+          "locatorResolved": "page.getByTestId('create-order-submit')",
+          "actualValue": "Clicked (Element visible & enabled)",
+          "expectedValue": "Click dispatched",
+          "logLines": [
+            "Auto-wait passed; pointer click dispatched on page.getByTestId('create-order-submit')."
+          ],
+          "domSnapshotSnippet": "<button data-testid=\"create-order-submit\" data-clicked=\"true\">Action Button</button>"
+        },
+        {
+          "stepId": "step-108",
+          "stepIndex": 7,
+          "actionId": "assert.text",
+          "label": "Assert Order Status Badge Reads Approved & Dispatched",
+          "status": "passed",
+          "durationMs": 130,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "await expect(page.getByTestId('order-status-badge')).toContainText('Approved & Dispatched');",
+          "locatorResolved": "page.getByTestId('order-status-badge')",
+          "actualValue": "Approved & Dispatched",
+          "expectedValue": "Approved & Dispatched",
+          "logLines": [
+            "Verified text \"Approved & Dispatched\" matches \"Approved & Dispatched\"."
+          ],
+          "domSnapshotSnippet": "<span data-testid=\"order-status-badge\">Approved & Dispatched</span>"
+        },
+        {
+          "stepId": "step-109",
+          "stepIndex": 8,
+          "actionId": "logic.setVariable",
+          "label": "Capture Generated Order ID into Variable",
+          "status": "passed",
+          "durationMs": 95,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "const capturedOrderCode = (await page.getByTestId('latest-order-id').textContent())?.trim() ?? '';",
+          "locatorResolved": "page.getByTestId('latest-order-id')",
+          "actualValue": "capturedOrderCode = \"ORD-2026-8841\"",
+          "expectedValue": "Non-empty string",
+          "logLines": [
+            "Extracted \"ORD-2026-8841\" into workflow variable {{capturedOrderCode}}."
+          ],
+          "domSnapshotSnippet": "<code data-testid=\"latest-order-id\">ORD-2026-8841</code>"
+        },
+        {
+          "stepId": "step-110",
+          "stepIndex": 9,
+          "actionId": "adv.captureScreenshot",
+          "label": "Capture Order Confirmation Evidence Screenshot",
+          "status": "passed",
+          "durationMs": 130,
+          "startedAt": "2026-11-11T04:05:59.028Z",
+          "completedAt": "2026-11-11T04:05:59.028Z",
+          "generatedCodeLine": "// Capture Evidence Screenshot: Capture Order Confirmation Evidence Screenshot",
+          "locatorResolved": "page",
+          "actualValue": "Verified OK",
+          "expectedValue": "Verified OK",
+          "logLines": [
+            "Executed Capture Evidence Screenshot successfully."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"dashboard-welcome-banner\">Acme Cloud Portal Ready</div>"
+        }
+      ],
+      "logs": [
+        "[04:05:59.030] Worker pw-runner-us-east-01 (docker://9f82c1a4b01e) leased job EX-1005 [browser=chromium, env=Staging (Controlled Target)]",
+        "[04:05:59.030] Step 1 PASSED (210ms): Navigate to Controlled Sample Portal -> HTTP 200 (/sample-app)",
+        "[04:05:59.030] Step 2 PASSED (65ms): Configure Desktop 1440x900 Viewport -> 1440x900",
+        "[04:05:59.030] Step 3 PASSED (340ms): Execute SOP: Enterprise SSO Login -> Executed 3 encapsulated SOP steps",
+        "[04:05:59.030] Step 4 PASSED (130ms): Verify Welcome Banner Is Visible -> Verified OK",
+        "[04:05:59.030] Step 5 PASSED (145ms): Set Order Quantity to 5 Units -> 5",
+        "[04:05:59.030] Step 6 PASSED (120ms): Check Expedited Shipping Option -> checked=true",
+        "[04:05:59.030] Step 7 PASSED (160ms): Click Submit Order Button -> Clicked (Element visible & enabled)",
+        "[04:05:59.030] Step 8 PASSED (130ms): Assert Order Status Badge Reads Approved & Dispatched -> Approved & Dispatched",
+        "[04:05:59.031] Step 9 PASSED (95ms): Capture Generated Order ID into Variable -> capturedOrderCode = \"ORD-2026-8841\"",
+        "[04:05:59.031] Step 10 PASSED (130ms): Capture Order Confirmation Evidence Screenshot -> Verified OK",
+        "[04:05:59.031] Playwright Trace archived: trace-EX-1005-chromium.zip (10/10 steps passed in 1525ms)"
+      ],
+      "generatedSpecCode": "import { test, expect } from '@playwright/test';\nimport { runSop_enterpriseSsoLogin } from '../sop-modules/enterprise-sso-login'; // v2.4.0 (git@github.com:acme-org/playwright-sop-library.git#v2.4.0)\n\nconst testDataRows = [\n  {\n    \"orderQty\": \"5\",\n    \"department\": \"Cloud Infrastructure\"\n  },\n  {\n    \"orderQty\": \"12\",\n    \"department\": \"Security Operations\"\n  }\n];\n\ntest.describe('ACME-TC-101 - E2E Procurement Order Creation & Supervisor Approval (v4)', () => {\n  test('E2E Procurement Order Creation & Supervisor Approval @smoke @e2e @procurement', async ({ page, context }) => {\n    // [Step 1: id=step-101] Navigate to Controlled Sample Portal\n    await page.goto('/sample-app', { waitUntil: 'domcontentloaded' });\n\n    // [Step 2: id=step-102] Configure Desktop 1440x900 Viewport\n    await page.setViewportSize({ width: 1440, height: 900 });\n\n    // [Step 3: id=step-103] Execute SOP: Enterprise SSO Login\n    await runSop_enterpriseSsoLogin(page, {\"username\":\"qa.lead@acme.io\",\"role\":\"Supervisor\"});\n\n    // [Step 4: id=step-104] Verify Welcome Banner Is Visible\n    await expect(page.getByTestId('dashboard-welcome-banner')).toBeVisible();\n\n    // [Step 5: id=step-105] Set Order Quantity to 5 Units\n    await page.getByTestId('quantity-input').clear();\n    await page.getByTestId('quantity-input').fill('5');\n\n    // [Step 6: id=step-106] Check Expedited Shipping Option\n    await page.getByTestId('expedited-shipping-checkbox').check();\n\n    // [Step 7: id=step-107] Click Submit Order Button\n    await page.getByTestId('create-order-submit').click();\n\n    // [Step 8: id=step-108] Assert Order Status Badge Reads Approved & Dispatched\n    await expect(page.getByTestId('order-status-badge')).toContainText('Approved & Dispatched');\n\n    // [Step 9: id=step-109] Capture Generated Order ID into Variable\n    const capturedOrderCode = (await page.getByTestId('latest-order-id').textContent())?.trim() ?? '';\n\n    // [Step 10: id=step-110] Capture Order Confirmation Evidence Screenshot\n    await page.screenshot({ path: 'artifacts/order-approved-confirmation.png', fullPage: true });\n\n  });\n});",
+      "traceArtifactId": "trace-EX-1005-chromium.zip",
+      "videoArtifactId": "video-EX-1005-chromium.webm",
+      "screenshotArtifactId": "evidence-EX-1005.png",
+      "cpuPeakPercent": 42,
+      "memoryPeakMb": 1500
+    },
+    {
+      "id": "EX-1004",
+      "runNumber": 1004,
+      "workspaceId": "ws-enterprise-01",
+      "projectId": "proj-acme-cloud",
+      "testPlanId": "tp-release-2026-4",
+      "testSuiteId": "ts-checkout-e2e",
+      "testCaseId": "tc-101",
+      "testCaseCode": "ACME-TC-101",
+      "testCaseTitle": "E2E Procurement Order Creation & Supervisor Approval",
+      "triggerSource": "manual",
+      "triggeredBy": "Jordan Rivera",
+      "triggeredByRole": "manual_qa",
+      "environmentName": "Staging (Controlled Target)",
+      "baseUrl": "http://localhost:3000",
+      "browser": "chromium",
+      "workerId": "worker-us-east-01",
+      "workerName": "pw-runner-us-east-01",
+      "status": "passed",
+      "retryAttempt": 0,
+      "maxRetries": 1,
+      "queuedAt": "2026-11-10T19:35:11Z",
+      "startedAt": "2026-11-10T19:35:12Z",
+      "completedAt": "2026-11-10T19:35:14Z",
+      "durationMs": 1810,
+      "queueWaitMs": 120,
+      "passedSteps": 10,
+      "failedSteps": 0,
+      "skippedSteps": 0,
+      "totalSteps": 10,
+      "generatedSpecCode": "import { test, expect } from '@playwright/test';\nimport { runSop_enterpriseSsoLogin } from '../sop-modules/enterprise-sso-login'; // v2.4.0 (git@github.com:acme-org/playwright-sop-library.git#v2.4.0)\n\nconst testDataRows = [\n  {\n    \"orderQty\": \"5\",\n    \"department\": \"Cloud Infrastructure\"\n  },\n  {\n    \"orderQty\": \"12\",\n    \"department\": \"Security Operations\"\n  }\n];\n\ntest.describe('ACME-TC-101 - E2E Procurement Order Creation & Supervisor Approval (v4)', () => {\n  test('E2E Procurement Order Creation & Supervisor Approval @smoke @e2e @procurement', async ({ page, context }) => {\n    // [Step 1: id=step-101] Navigate to Controlled Sample Portal\n    await page.goto('/sample-app', { waitUntil: 'domcontentloaded' });\n\n    // [Step 2: id=step-102] Configure Desktop 1440x900 Viewport\n    await page.setViewportSize({ width: 1440, height: 900 });\n\n    // [Step 3: id=step-103] Execute SOP: Enterprise SSO Login\n    await runSop_enterpriseSsoLogin(page, {\"username\":\"qa.lead@acme.io\",\"role\":\"Supervisor\"});\n\n    // [Step 4: id=step-104] Verify Welcome Banner Is Visible\n    await expect(page.getByTestId('dashboard-welcome-banner')).toBeVisible();\n\n    // [Step 5: id=step-105] Set Order Quantity to 5 Units\n    await page.getByTestId('quantity-input').clear();\n    await page.getByTestId('quantity-input').fill('5');\n\n    // [Step 6: id=step-106] Check Expedited Shipping Option\n    await page.getByTestId('expedited-shipping-checkbox').check();\n\n    // [Step 7: id=step-107] Click Submit Order Button\n    await page.getByTestId('create-order-submit').click();\n\n    // [Step 8: id=step-108] Assert Order Status Badge Reads Approved & Dispatched\n    await expect(page.getByTestId('order-status-badge')).toContainText('Approved & Dispatched');\n\n    // [Step 9: id=step-109] Capture Generated Order ID into Variable\n    const capturedOrderCode = (await page.getByTestId('latest-order-id').textContent())?.trim() ?? '';\n\n    // [Step 10: id=step-110] Capture Order Confirmation Evidence Screenshot\n    await page.screenshot({ path: 'artifacts/order-approved-confirmation.png', fullPage: true });\n\n  });\n});",
+      "traceArtifactId": "trace-EX-1004-chromium.zip",
+      "videoArtifactId": "video-EX-1004-chromium.webm",
+      "screenshotArtifactId": "order-approved-confirmation.png",
+      "cpuPeakPercent": 46,
+      "memoryPeakMb": 1640,
+      "logs": [
+        "[19:35:12.010] Worker pw-runner-us-east-01 leased job EX-1004 (browser=chromium)",
+        "[19:35:12.140] Step 1 PASSED: page.goto(\"/sample-app\") -> HTTP 200 OK",
+        "[19:35:12.220] Step 2 PASSED: page.setViewportSize({ width: 1440, height: 900 })",
+        "[19:35:12.590] Step 3 PASSED: SOP module runSop_enterpriseSsoLogin(page, {\"username\":\"qa.lead@acme.io\",\"role\":\"Supervisor\"})",
+        "[19:35:12.810] Step 4 PASSED: expect(page.getByTestId(\"dashboard-welcome-banner\")).toBeVisible()",
+        "[19:35:13.020] Step 5 PASSED: page.getByTestId(\"quantity-input\").fill(\"5\")",
+        "[19:35:13.190] Step 6 PASSED: page.getByTestId(\"expedited-shipping-checkbox\").check()",
+        "[19:35:13.440] Step 7 PASSED: page.getByTestId(\"create-order-submit\").click()",
+        "[19:35:13.610] Step 8 PASSED: expect(page.getByTestId(\"order-status-badge\")).toContainText(\"Approved & Dispatched\")",
+        "[19:35:13.710] Step 9 PASSED: Variable capturedOrderCode = \"ORD-2026-8841\"",
+        "[19:35:13.820] Step 10 PASSED: Captured full-page artifact order-approved-confirmation.png",
+        "[19:35:13.820] Playwright Trace saved: trace-EX-1004-chromium.zip (10/10 steps passed)"
+      ],
+      "stepResults": [
+        {
+          "stepId": "step-101",
+          "stepIndex": 0,
+          "actionId": "nav.goto",
+          "label": "Navigate to Controlled Sample Portal",
+          "status": "passed",
+          "durationMs": 140,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 1: Navigate to Controlled Sample Portal",
+          "locatorResolved": "page",
+          "actualValue": "OK",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 1 (nav.goto) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        },
+        {
+          "stepId": "step-102",
+          "stepIndex": 1,
+          "actionId": "nav.viewport",
+          "label": "Configure Desktop 1440x900 Viewport",
+          "status": "passed",
+          "durationMs": 175,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 2: Configure Desktop 1440x900 Viewport",
+          "locatorResolved": "page",
+          "actualValue": "OK",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 2 (nav.viewport) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        },
+        {
+          "stepId": "step-103",
+          "stepIndex": 2,
+          "actionId": "logic.subflow",
+          "label": "Execute SOP: Enterprise SSO Login",
+          "status": "passed",
+          "durationMs": 210,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 3: Execute SOP: Enterprise SSO Login",
+          "locatorResolved": "page",
+          "actualValue": "OK",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 3 (logic.subflow) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        },
+        {
+          "stepId": "step-104",
+          "stepIndex": 3,
+          "actionId": "assert.visible",
+          "label": "Verify Welcome Banner Is Visible",
+          "status": "passed",
+          "durationMs": 245,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 4: Verify Welcome Banner Is Visible",
+          "locatorResolved": "page.getByTestId('dashboard-welcome-banner')",
+          "actualValue": "OK",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 4 (assert.visible) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        },
+        {
+          "stepId": "step-105",
+          "stepIndex": 4,
+          "actionId": "act.fill",
+          "label": "Set Order Quantity to 5 Units",
+          "status": "passed",
+          "durationMs": 140,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 5: Set Order Quantity to 5 Units",
+          "locatorResolved": "page.getByTestId('quantity-input')",
+          "actualValue": "OK",
+          "expectedValue": "5",
+          "logLines": [
+            "Step 5 (act.fill) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        },
+        {
+          "stepId": "step-106",
+          "stepIndex": 5,
+          "actionId": "act.check",
+          "label": "Check Expedited Shipping Option",
+          "status": "passed",
+          "durationMs": 175,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 6: Check Expedited Shipping Option",
+          "locatorResolved": "page.getByTestId('expedited-shipping-checkbox')",
+          "actualValue": "OK",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 6 (act.check) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        },
+        {
+          "stepId": "step-107",
+          "stepIndex": 6,
+          "actionId": "act.click",
+          "label": "Click Submit Order Button",
+          "status": "passed",
+          "durationMs": 210,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 7: Click Submit Order Button",
+          "locatorResolved": "page.getByTestId('create-order-submit')",
+          "actualValue": "OK",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 7 (act.click) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        },
+        {
+          "stepId": "step-108",
+          "stepIndex": 7,
+          "actionId": "assert.text",
+          "label": "Assert Order Status Badge Reads Approved & Dispatched",
+          "status": "passed",
+          "durationMs": 245,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 8: Assert Order Status Badge Reads Approved & Dispatched",
+          "locatorResolved": "page.getByTestId('order-status-badge')",
+          "actualValue": "Approved & Dispatched",
+          "expectedValue": "Approved & Dispatched",
+          "logLines": [
+            "Step 8 (assert.text) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        },
+        {
+          "stepId": "step-109",
+          "stepIndex": 8,
+          "actionId": "logic.setVariable",
+          "label": "Capture Generated Order ID into Variable",
+          "status": "passed",
+          "durationMs": 140,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 9: Capture Generated Order ID into Variable",
+          "locatorResolved": "page",
+          "actualValue": "ORD-2026-8841",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 9 (logic.setVariable) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        },
+        {
+          "stepId": "step-110",
+          "stepIndex": 9,
+          "actionId": "adv.captureScreenshot",
+          "label": "Capture Order Confirmation Evidence Screenshot",
+          "status": "passed",
+          "durationMs": 175,
+          "startedAt": "2026-11-10T19:35:12Z",
+          "completedAt": "2026-11-10T19:35:14Z",
+          "generatedCodeLine": "// Step 10: Capture Order Confirmation Evidence Screenshot",
+          "locatorResolved": "page",
+          "actualValue": "OK",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 10 (adv.captureScreenshot) completed cleanly."
+          ],
+          "domSnapshotSnippet": "<div data-testid=\"order-status-badge\" class=\"status-approved\">Approved & Dispatched · ORD-2026-8841</div>"
+        }
+      ]
+    },
+    {
+      "id": "EX-1003",
+      "runNumber": 1003,
+      "workspaceId": "ws-enterprise-01",
+      "projectId": "proj-acme-cloud",
+      "testPlanId": "tp-release-2026-4",
+      "testSuiteId": "ts-inventory-grid",
+      "testCaseId": "tc-102",
+      "testCaseCode": "ACME-TC-102",
+      "testCaseTitle": "Inventory Catalog Category Filtering & Row Count Verification",
+      "triggerSource": "suite",
+      "triggeredBy": "Priya Nair",
+      "triggeredByRole": "automation_engineer",
+      "environmentName": "Staging (Controlled Target)",
+      "baseUrl": "http://localhost:3000",
+      "browser": "webkit",
+      "workerId": "worker-us-east-02",
+      "workerName": "pw-runner-us-east-02",
+      "status": "passed",
+      "retryAttempt": 0,
+      "maxRetries": 1,
+      "queuedAt": "2026-11-10T19:32:07Z",
+      "startedAt": "2026-11-10T19:32:08Z",
+      "completedAt": "2026-11-10T19:32:09Z",
+      "durationMs": 1140,
+      "queueWaitMs": 95,
+      "passedSteps": 5,
+      "failedSteps": 0,
+      "skippedSteps": 0,
+      "totalSteps": 5,
+      "generatedSpecCode": "import { test, expect } from '@playwright/test';\n\ntest.describe('ACME-TC-102 - Inventory Catalog Category Filtering & Row Count Verification (v2)', () => {\n  test('Inventory Catalog Category Filtering & Row Count Verification @regression @inventory @grid', async ({ page, context }) => {\n    // [Step 1: id=step-201] Open Controlled Sample Portal\n    await page.goto('/sample-app', { waitUntil: 'domcontentloaded' });\n\n    // [Step 2: id=step-202] Verify Default Inventory Table Shows 4 Items\n    await expect(page.getByTestId('inventory-row')).toHaveCount(4);\n\n    // [Step 3: id=step-203] Filter Inventory by Hardware Category\n    await page.getByTestId('category-filter-select').selectOption('Hardware');\n\n    // [Step 4: id=step-204] Assert Filtered Hardware Row Count Equals 2\n    await expect(page.getByTestId('inventory-row')).toHaveCount(2);\n\n    // [Step 5: id=step-205] Verify Supervisor Approval Toggle Is Active\n    await expect(page.getByTestId('approval-toggle-btn')).toHaveAttribute('aria-pressed', 'true');\n\n  });\n});",
+      "traceArtifactId": "trace-EX-1003-webkit.zip",
+      "cpuPeakPercent": 39,
+      "memoryPeakMb": 1410,
+      "logs": [
+        "[19:32:08.005] Worker pw-runner-us-east-02 leased job EX-1003 (browser=webkit)",
+        "[19:32:08.250] Step 1 PASSED: Navigated to /sample-app",
+        "[19:32:08.480] Step 2 PASSED: Verified 4 inventory rows",
+        "[19:32:08.710] Step 3 PASSED: Selected Hardware filter option",
+        "[19:32:08.950] Step 4 PASSED: Verified 2 filtered Hardware rows",
+        "[19:32:09.145] Step 5 PASSED: Verified aria-pressed=\"true\" on approval toggle"
+      ],
+      "stepResults": [
+        {
+          "stepId": "step-201",
+          "stepIndex": 0,
+          "actionId": "nav.goto",
+          "label": "Open Controlled Sample Portal",
+          "status": "passed",
+          "durationMs": 210,
+          "startedAt": "2026-11-10T19:32:08Z",
+          "completedAt": "2026-11-10T19:32:09Z",
+          "generatedCodeLine": "// Step 1: Open Controlled Sample Portal",
+          "locatorResolved": "page",
+          "actualValue": "OK",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 1 verified."
+          ]
+        },
+        {
+          "stepId": "step-202",
+          "stepIndex": 1,
+          "actionId": "assert.count",
+          "label": "Verify Default Inventory Table Shows 4 Items",
+          "status": "passed",
+          "durationMs": 210,
+          "startedAt": "2026-11-10T19:32:08Z",
+          "completedAt": "2026-11-10T19:32:09Z",
+          "generatedCodeLine": "// Step 2: Verify Default Inventory Table Shows 4 Items",
+          "locatorResolved": "page.getByTestId('inventory-row')",
+          "actualValue": "4",
+          "expectedValue": "4",
+          "logLines": [
+            "Step 2 verified."
+          ]
+        },
+        {
+          "stepId": "step-203",
+          "stepIndex": 2,
+          "actionId": "act.selectOption",
+          "label": "Filter Inventory by Hardware Category",
+          "status": "passed",
+          "durationMs": 210,
+          "startedAt": "2026-11-10T19:32:08Z",
+          "completedAt": "2026-11-10T19:32:09Z",
+          "generatedCodeLine": "// Step 3: Filter Inventory by Hardware Category",
+          "locatorResolved": "page.getByTestId('category-filter-select')",
+          "actualValue": "OK",
+          "expectedValue": "OK",
+          "logLines": [
+            "Step 3 verified."
+          ]
+        },
+        {
+          "stepId": "step-204",
+          "stepIndex": 3,
+          "actionId": "assert.count",
+          "label": "Assert Filtered Hardware Row Count Equals 2",
+          "status": "passed",
+          "durationMs": 210,
+          "startedAt": "2026-11-10T19:32:08Z",
+          "completedAt": "2026-11-10T19:32:09Z",
+          "generatedCodeLine": "// Step 4: Assert Filtered Hardware Row Count Equals 2",
+          "locatorResolved": "page.getByTestId('inventory-row')",
+          "actualValue": "2",
+          "expectedValue": "2",
+          "logLines": [
+            "Step 4 verified."
+          ]
+        },
+        {
+          "stepId": "step-205",
+          "stepIndex": 4,
+          "actionId": "assert.attribute",
+          "label": "Verify Supervisor Approval Toggle Is Active",
+          "status": "passed",
+          "durationMs": 210,
+          "startedAt": "2026-11-10T19:32:08Z",
+          "completedAt": "2026-11-10T19:32:09Z",
+          "generatedCodeLine": "// Step 5: Verify Supervisor Approval Toggle Is Active",
+          "locatorResolved": "page.getByTestId('approval-toggle-btn')",
+          "actualValue": "true",
+          "expectedValue": "true",
+          "logLines": [
+            "Step 5 verified."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "EX-1002",
+      "runNumber": 1002,
+      "workspaceId": "ws-enterprise-01",
+      "projectId": "proj-finledger",
+      "testPlanId": "tp-fin-q4",
+      "testSuiteId": "ts-fin-settlement",
+      "testCaseId": "tc-201",
+      "testCaseCode": "FINL-TC-201",
+      "testCaseTitle": "Cross-Border Settlement Batch Status Assertion (Negative / Failure Demo)",
+      "triggerSource": "schedule",
+      "triggeredBy": "Nightly Scheduler",
+      "triggeredByRole": "automation_engineer",
+      "environmentName": "QA Sandbox",
+      "baseUrl": "http://localhost:3000",
+      "browser": "firefox",
+      "workerId": "worker-eu-west-01",
+      "workerName": "pw-runner-eu-west-01",
+      "status": "failed",
+      "retryAttempt": 2,
+      "maxRetries": 2,
+      "queuedAt": "2026-11-10T19:29:41Z",
+      "startedAt": "2026-11-10T19:29:42Z",
+      "completedAt": "2026-11-10T19:29:44Z",
+      "durationMs": 2290,
+      "queueWaitMs": 180,
+      "passedSteps": 2,
+      "failedSteps": 1,
+      "skippedSteps": 0,
+      "totalSteps": 3,
+      "generatedSpecCode": "import { test, expect } from '@playwright/test';\n\ntest.describe('FINL-TC-201 - Cross-Border Settlement Batch Status Assertion (Negative / Failure Demo) (v3)', () => {\n  test('Cross-Border Settlement Batch Status Assertion (Negative / Failure Demo) @settlement @flaky-watch @compliance', async ({ page, context }) => {\n    // [Step 1: id=step-401] Navigate to FinLedger Settlement Portal\n    await page.goto('/sample-app', { waitUntil: 'domcontentloaded' });\n\n    // [Step 2: id=step-402] Wait for Settlement Batch Webhook Response\n    await page.waitForResponse((res) => res.url().includes('/api/platform') && res.status() === 200);\n\n    // [Step 3: id=step-403] Verify Settlement Batch Reconciled Status\n    await expect(page.getByTestId('order-status-badge')).toHaveText('Batch Settlement Completed #99');\n\n  });\n});",
+      "traceArtifactId": "trace-EX-1002-firefox.zip",
+      "screenshotArtifactId": "failure-EX-1002-step-3.png",
+      "cpuPeakPercent": 62,
+      "memoryPeakMb": 2340,
+      "failureFingerprint": "FINL-TC-201::step-403::assert.text::Batch Settlement Completed #99",
+      "linkedIssueKey": "JIRA-QA-409",
+      "logs": [
+        "[19:29:42.010] Worker pw-runner-eu-west-01 leased job EX-1002 (browser=firefox)",
+        "[19:29:42.310] Step 1 PASSED: page.goto(\"/sample-app\")",
+        "[19:29:42.680] Step 2 PASSED: page.waitForResponse(\"/api/platform\" -> 200)",
+        "[19:29:44.300] Step 3 FAILED: Expect(page.getByTestId(\"order-status-badge\")).toHaveText(\"Batch Settlement Completed #99\")",
+        "[19:29:44.300]   Expected string: \"Batch Settlement Completed #99\"",
+        "[19:29:44.300]   Received string: \"Approved & Dispatched\"",
+        "[19:29:44.310] Linked existing deduplicated issue JIRA-QA-409 (occurrence #3)"
+      ],
+      "stepResults": [
+        {
+          "stepId": "step-401",
+          "stepIndex": 0,
+          "actionId": "nav.goto",
+          "label": "Navigate to FinLedger Settlement Portal",
+          "status": "passed",
+          "durationMs": 300,
+          "startedAt": "2026-11-10T19:29:42Z",
+          "completedAt": "2026-11-10T19:29:42Z",
+          "generatedCodeLine": "await page.goto('/sample-app');",
+          "locatorResolved": "page",
+          "actualValue": "/sample-app",
+          "expectedValue": "/sample-app",
+          "logLines": [
+            "Navigated to /sample-app (200 OK)"
+          ]
+        },
+        {
+          "stepId": "step-402",
+          "stepIndex": 1,
+          "actionId": "sync.waitForResponse",
+          "label": "Wait for Settlement Batch Webhook Response",
+          "status": "passed",
+          "durationMs": 370,
+          "startedAt": "2026-11-10T19:29:42Z",
+          "completedAt": "2026-11-10T19:29:43Z",
+          "generatedCodeLine": "await page.waitForResponse((res) => res.url().includes('/api/platform') && res.status() === 200);",
+          "locatorResolved": "network",
+          "actualValue": "200",
+          "expectedValue": "200",
+          "logLines": [
+            "Matched GET /api/platform -> 200 OK"
+          ]
+        },
+        {
+          "stepId": "step-403",
+          "stepIndex": 2,
+          "actionId": "assert.text",
+          "label": "Verify Settlement Batch Reconciled Status",
+          "status": "failed",
+          "durationMs": 1620,
+          "startedAt": "2026-11-10T19:29:43Z",
+          "completedAt": "2026-11-10T19:29:44Z",
+          "generatedCodeLine": "await expect(page.getByTestId('order-status-badge')).toHaveText('Batch Settlement Completed #99');",
+          "locatorResolved": "page.getByTestId('order-status-badge')",
+          "actualValue": "Approved & Dispatched",
+          "expectedValue": "Batch Settlement Completed #99",
+          "errorMessage": "Timed out 5000ms waiting for expect(locator).toHaveText(expected) — Expected: \"Batch Settlement Completed #99\", Received: \"Approved & Dispatched\"",
+          "stackTrace": "Error: Timed out 5000ms waiting for expect(locator).toHaveText(expected)\nLocator: getByTestId('order-status-badge')\nExpected string: \"Batch Settlement Completed #99\"\nReceived string: \"Approved & Dispatched\"\n    at tests/FINL-TC-201.spec.ts:18:56",
+          "logLines": [
+            "Locator resolved to <span data-testid=\"order-status-badge\">Approved & Dispatched</span>",
+            "Assertion failed after auto-wait retry budget exhausted."
+          ],
+          "domSnapshotSnippet": "<span data-testid=\"order-status-badge\" class=\"status-pill\">Approved & Dispatched</span>"
+        }
+      ]
+    }
+  ],
+  "secrets": [
+    {
+      "id": "sec-1",
+      "key": "ACME_SSO_PASSWORD",
+      "environmentSlug": "staging",
+      "projectId": "proj-acme-cloud",
+      "maskedValue": "•••••••••••••••••••• (AES-256-GCM)",
+      "createdAt": "2026-10-01T12:00:00Z",
+      "createdBy": "Elena Vance",
+      "lastUsedAt": "2026-11-10T19:35:12Z"
+    },
+    {
+      "id": "sec-2",
+      "key": "ACME_API_KEY",
+      "environmentSlug": "staging",
+      "projectId": "proj-acme-cloud",
+      "maskedValue": "•••••••••••••••••••• (AES-256-GCM)",
+      "createdAt": "2026-10-04T09:30:00Z",
+      "createdBy": "Marcus Chen",
+      "lastUsedAt": "2026-11-10T18:10:00Z"
+    }
+  ],
+  "notificationRules": [
+    {
+      "id": "notif-slack-1",
+      "name": "QA Alerts — #qa-automation-alerts",
+      "channel": "slack",
+      "targetDestination": "#qa-automation-alerts",
+      "events": [
+        "execution_failed",
+        "worker_unhealthy",
+        "flaky_threshold"
+      ],
+      "enabled": true,
+      "deduplicateFailures": true,
+      "projectId": "proj-acme-cloud"
+    },
+    {
+      "id": "notif-jira-1",
+      "name": "Jira Auto-Triage (Deduplicated by Fingerprint)",
+      "channel": "jira",
+      "targetDestination": "Project: JIRA-QA",
+      "events": [
+        "execution_failed"
+      ],
+      "enabled": true,
+      "deduplicateFailures": true,
+      "projectId": "proj-finledger"
+    },
+    {
+      "id": "notif-teams-1",
+      "name": "Release Sign-Off Digest — MS Teams",
+      "channel": "teams",
+      "targetDestination": "Release Engineering Channel",
+      "events": [
+        "execution_completed",
+        "execution_failed"
+      ],
+      "enabled": true,
+      "deduplicateFailures": false,
+      "projectId": "proj-acme-cloud"
+    }
+  ],
+  "notificationHistory": [
+    {
+      "id": "nd-1794369959031-262",
+      "ruleId": "notif-teams-1",
+      "channel": "teams",
+      "destination": "Release Engineering Channel",
+      "subject": "[PASSED] EX-1005 — ACME-TC-101 (chromium)",
+      "message": "10/10 steps passed in 1525ms on pw-runner-us-east-01.",
+      "executionId": "EX-1005",
+      "createdAt": "2026-11-11T04:05:59.028Z",
+      "deduplicated": false
+    },
+    {
+      "id": "nd-1",
+      "ruleId": "notif-jira-1",
+      "channel": "jira",
+      "destination": "Project: JIRA-QA",
+      "subject": "[DEDUPLICATED] Failure in FINL-TC-201 linked to JIRA-QA-409",
+      "message": "Execution EX-1002 failed with matching fingerprint FINL-TC-201::step-403. Incremented occurrence counter on JIRA-QA-409 instead of creating duplicate ticket.",
+      "executionId": "EX-1002",
+      "issueKey": "JIRA-QA-409",
+      "createdAt": "2026-11-10T19:29:44Z",
+      "deduplicated": true
+    },
+    {
+      "id": "nd-2",
+      "ruleId": "notif-teams-1",
+      "channel": "teams",
+      "destination": "Release Engineering Channel",
+      "subject": "Execution EX-1004 PASSED (ACME-TC-101)",
+      "message": "10/10 steps passed on Chromium in 1,810ms via worker pw-runner-us-east-01.",
+      "executionId": "EX-1004",
+      "createdAt": "2026-11-10T19:35:14Z",
+      "deduplicated": false
+    }
+  ],
+  "issues": [
+    {
+      "id": "iss-1",
+      "key": "JIRA-QA-409",
+      "title": "FINL-TC-201: Settlement status badge shows Approved & Dispatched instead of Batch Settlement Completed #99",
+      "projectId": "proj-finledger",
+      "testCaseId": "tc-201",
+      "executionId": "EX-1002",
+      "failureFingerprint": "FINL-TC-201::step-403::assert.text::Batch Settlement Completed #99",
+      "status": "Open",
+      "occurrenceCount": 3,
+      "createdAt": "2026-11-09T22:15:00Z",
+      "lastSeenAt": "2026-11-10T19:29:44Z",
+      "assignee": "Elena Vance"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "aud-1794369959031-963",
+      "timestamp": "2026-11-11T04:05:59.031Z",
+      "ipAddress": "10.42.0.1",
+      "actor": "Platform Administrator",
+      "role": "platform_admin",
+      "action": "EXECUTE_TEST_CASE",
+      "resourceType": "execution",
+      "resourceId": "EX-1005",
+      "details": "Executed ACME-TC-101 on chromium (pw-runner-us-east-01) -> PASSED"
+    },
+    {
+      "id": "aud-1",
+      "timestamp": "2026-11-10T19:35:12Z",
+      "actor": "Jordan Rivera",
+      "role": "manual_qa",
+      "action": "TRIGGER_EXECUTION",
+      "resourceType": "execution",
+      "resourceId": "EX-1004",
+      "details": "Triggered manual execution of ACME-TC-101 on Chromium (Staging)",
+      "ipAddress": "10.14.88.102"
+    },
+    {
+      "id": "aud-2",
+      "timestamp": "2026-11-10T19:30:00Z",
+      "actor": "Alex Morgan",
+      "role": "platform_admin",
+      "action": "DRAIN_WORKER",
+      "resourceType": "worker",
+      "resourceId": "worker-apac-01",
+      "details": "Transitioned worker pw-runner-apac-01 to DRAINING state for maintenance",
+      "ipAddress": "10.14.12.04"
+    },
+    {
+      "id": "aud-3",
+      "timestamp": "2026-11-10T16:30:00Z",
+      "actor": "Elena Vance",
+      "role": "automation_engineer",
+      "action": "UPDATE_TEST_WORKFLOW",
+      "resourceType": "test_case",
+      "resourceId": "tc-101",
+      "details": "Saved visual workflow v4 for ACME-TC-101 (10 steps, valid Playwright TypeScript)",
+      "ipAddress": "10.14.22.19"
+    }
+  ]
+}
