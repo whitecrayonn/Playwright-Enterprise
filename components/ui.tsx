@@ -87,6 +87,7 @@ export function statusTone(status: string): Tone {
     case 'timed_out':
     case 'infra_error':
     case 'deprecated':
+    case 'error':
       return 'bad';
     case 'queued':
     case 'running':
@@ -94,6 +95,9 @@ export function statusTone(status: string): Tone {
     case 'draining':
     case 'draft':
       return 'warn';
+    case 'pending':
+    case 'skipped':
+      return 'neutral';
     default:
       return 'neutral';
   }

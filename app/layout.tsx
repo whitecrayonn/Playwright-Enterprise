@@ -2,20 +2,20 @@ import type {Metadata} from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Playwright Studio Enterprise',
+  title: 'Playwright Studio',
   description:
-    'Enterprise-ready no-code and low-code visual Playwright test automation platform with real-time execution orchestration, worker cluster management, SOP module registry, and deep AI root-cause analysis.',
+    'Build real browser tests by snapping blocks together, then run them with Playwright.',
   openGraph: {
-    title: 'Playwright Studio Enterprise',
+    title: 'Playwright Studio',
     description:
-      'Enterprise-ready no-code and low-code visual Playwright test automation platform with real-time execution orchestration, worker cluster management, SOP module registry, and deep AI root-cause analysis.',
+      'Build real browser tests by snapping blocks together, then run them with Playwright.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Playwright Studio Enterprise',
+    title: 'Playwright Studio',
     description:
-      'Enterprise-ready no-code and low-code visual Playwright test automation platform with real-time execution orchestration, worker cluster management, SOP module registry, and deep AI root-cause analysis.',
+      'Build real browser tests by snapping blocks together, then run them with Playwright.',
   },
 };
 

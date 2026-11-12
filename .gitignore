@@ -5,3 +5,10 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Playwright Studio local state (real settings, tests and run artifacts)
+.env.json
+.data/studio.json
+.data/studio.json.*
+.data/artifacts/
+*.tsbuildinfo
