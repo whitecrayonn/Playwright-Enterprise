@@ -1,6 +1,6 @@
 {
-  "name": "Playwright Studio Enterprise",
-  "description": "Enterprise-ready no-code and low-code visual Playwright test automation platform with real-time execution orchestration, worker cluster management, SOP module registry, and deep AI root-cause analysis.",
+  "name": "Playwright Studio",
+  "description": "Build real browser tests by snapping blocks together, then run them with Playwright.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
